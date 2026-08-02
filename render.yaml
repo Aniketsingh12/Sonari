@@ -1,0 +1,85 @@
+# Render blueprint — one deploy of the single-container image.
+# In the Render dashboard: New → Blueprint → point at this repo. It builds the
+# Dockerfile and runs it. Everything below has a working default; the app comes
+# up on the built-in mock providers with no keys.
+#
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: sonari
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: FRONTEND_DIST
+        value: /app/static
+
+      # Password for the owner dashboard. Render prompts for this on deploy.
+      # LEAVING IT BLANK LEAVES THE DASHBOARD OPEN to anyone with the URL —
+      # they could read, edit and delete every agent. Shared voice-agent links
+      # keep working regardless.
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # --- AI providers ---
+      # Mock by default: the site works with NO keys, at $0. Voice is spoken by
+      # each visitor's own browser (system voices) and heard via the browser's
+      # speech recognition — so NO speech model runs on the server.
+      #
+      # FREE real AI (recommended) — no Ollama in the cloud, so use Gemini:
+      #   set GEMINI_API_KEY (secret) and change LLM_PROVIDER + EMBEDDING_PROVIDER
+      #   to `gemini`. Free key: https://aistudio.google.com/apikey
+      #   Optional server-side Whisper: STT_PROVIDER=groq + GROQ_API_KEY (free:
+      #   https://console.groq.com).
+      # PAID alternative: LLM_PROVIDER=anthropic|openai + the matching key below.
+      - key: LLM_PROVIDER
+        value: mock
+      - key: TTS_PROVIDER
+        value: mock
+      - key: STT_PROVIDER
+        value: mock
+      - key: EMBEDDING_PROVIDER
+        value: hash
+
+      # Free-tier keys — set as secrets to turn on real AI at no cost.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Paid keys — only if you select a paid provider above.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      # Fish Audio — cheaper than ElevenLabs and returns WAV, so it's the paid
+      # TTS that also works on real phone calls. Set TTS_PROVIDER=fish to use.
+      - key: FISH_API_KEY
+        sync: false
+
+      # Start empty (home page + wizard). Set true to auto-load the sample data.
+      - key: SEED_DEMO_DATA
+        value: "false"
+
+      # After the first deploy, set this to the service's public URL so Twilio
+      # media-stream callbacks resolve (only needed for real phone calls).
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+      # Default storage is SQLite on the container disk, which resets on each
+      # deploy/restart — fine for a demo. For persistence, uncomment the
+      # database block below and this DATABASE_URL wiring, then redeploy.
+      # - key: DATABASE_URL
+      #   fromDatabase:
+      #     name: sonari-db
+      #     property: connectionString
+
+# databases:
+#   - name: sonari-db
+#     plan: free

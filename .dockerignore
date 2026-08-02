@@ -1,0 +1,21 @@
+# Keep the build context small and reproducible.
+**/node_modules
+**/dist
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/*.db
+**/*.sqlite3
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.gitignore
+.logs
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+*.md
+!README.md
+backend/smoke_test.py

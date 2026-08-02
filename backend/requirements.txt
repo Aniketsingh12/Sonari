@@ -1,0 +1,42 @@
+# ---- Core web framework ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.19
+websockets==14.1
+httpx==0.28.1
+
+# ---- Config & validation ----
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# ---- Database (async SQLAlchemy; SQLite default, Postgres in production) ----
+SQLAlchemy==2.0.36
+aiosqlite==0.20.0
+greenlet==3.1.1
+# asyncpg ships wheels (no compiler needed) and lets a managed Postgres work by
+# just setting DATABASE_URL — used by the cloud deploy. Harmless on SQLite.
+asyncpg==0.30.0
+
+# ---- Background jobs ----
+celery==5.4.0
+redis==5.2.1
+
+# =====================================================================
+# OPTIONAL AI PROVIDERS — install only what you use. The app runs with
+# the built-in "mock" providers and zero external deps.
+# =====================================================================
+
+# Paid API models -----------------------------------------------------
+# anthropic==0.42.0          # LLM: Claude
+# openai==1.59.6             # LLM + STT (Whisper API) + TTS
+# elevenlabs==1.50.3         # TTS: ElevenLabs streaming
+
+# Open-source / local models ------------------------------------------
+# faster-whisper==1.1.1      # STT: local streaming Whisper
+# piper-tts==1.2.0           # TTS: local Piper voices
+# ollama==0.4.5              # LLM: local models via Ollama
+# sentence-transformers==3.3.1  # RAG: local embeddings
+
+# ---- Telephony ----
+twilio==9.4.1
