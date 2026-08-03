@@ -3,20 +3,13 @@ import { api } from "@/api/client";
 import { useQuery } from "@/api/hooks";
 import type { Business, Faq, SimulateTurnResult } from "@/api/types";
 import { Equalizer } from "@/components/LiveIndicator";
+import { VoiceControls } from "@/components/VoiceControls";
 import { PageHeader, Toggle } from "@/components/ui";
 import { IconMic, IconPhone, IconSend, IconUser, IconX } from "@/components/icons";
 import { classNames, outcomeMeta } from "@/lib/format";
 import { languageBase } from "@/lib/languages";
-import {
-  cancelSpeech,
-  getSttMode,
-  isRecordingSupported,
-  speak,
-  startRecording,
-  stopRecording,
-  transcribeBlob,
-  type SpeechMode,
-} from "@/lib/speech";
+import { useMic } from "@/lib/useMic";
+import { cancelSpeech, speak } from "@/lib/speech";
 
 interface Turn {
   role: "caller" | "agent";
@@ -103,14 +96,6 @@ function buildSuggestions(business: Business | null, faqs: Faq[]): string[] {
   return [...new Set(out.map((x) => x.trim()))];
 }
 
-// Optional voice input via the Web Speech API (Chrome/Edge). Falls back to text.
-type SpeechRec = { start: () => void; stop: () => void; onresult: ((e: any) => void) | null; onend: (() => void) | null; continuous: boolean; interimResults: boolean; lang: string };
-function getRecognition(): SpeechRec | null {
-  const w = window as any;
-  const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-  return Ctor ? new Ctor() : null;
-}
-
 export function Simulator({ business }: { business: Business | null }) {
   // Phone framing ("caller", "hang up") only fits the receptionist; every other
   // agent is a conversation, not a call.
@@ -125,24 +110,40 @@ export function Simulator({ business }: { business: Business | null }) {
   const [callId, setCallId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [autoplay, setAutoplay] = useState(true);
-  const [listening, setListening] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [sttMode, setSttMode] = useState<SpeechMode>("browser");
+  const [speaking, setSpeaking] = useState(false);
   const [live, setLive] = useState(false);
-  const recRef = useRef<SpeechRec | null>(null);
+  // Voice-first: the big mic is the default way in; typing is the fallback.
+  const [composer, setComposer] = useState<"voice" | "text">("voice");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getSttMode().then(setSttMode);
-  }, []);
+  // The async turn (LLM + playback) outlives a render, so the hands-free loop
+  // reads these refs instead of stale closure state.
+  const liveRef = useRef(live);
+  const composerRef = useRef(composer);
+  liveRef.current = live;
+  composerRef.current = composer;
+
+  const mic = useMic({
+    language: business?.language,
+    onText: (text) => void send(text, true),
+  });
+  const micRef = useRef(mic);
+  micRef.current = mic;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns]);
 
-  const say = (text: string) => {
+  useEffect(() => () => cancelSpeech(), []);
+
+  const say = async (text: string) => {
     if (!autoplay) return;
-    speak(text, { voiceId: business?.voice_id, lang: business?.language });
+    setSpeaking(true);
+    try {
+      await speak(text, { voiceId: business?.voice_id, lang: business?.language });
+    } finally {
+      setSpeaking(false);
+    }
   };
 
   const startCall = () => {
@@ -150,11 +151,13 @@ export function Simulator({ business }: { business: Business | null }) {
     const greeting =
       business?.greeting ?? "Thanks for calling! How can I help you today?";
     setTurns([{ role: "agent", text: greeting }]);
-    say(greeting);
+    void say(greeting);
   };
 
   const endCall = async () => {
+    mic.cancel();
     cancelSpeech();
+    setSpeaking(false);
     if (callId) await api.post(`/simulate/${callId}/hangup`).catch(() => {});
     setLive(false);
     setCallId(null);
@@ -162,7 +165,7 @@ export function Simulator({ business }: { business: Business | null }) {
     setInput("");
   };
 
-  const send = async (text: string) => {
+  const send = async (text: string, viaVoice = false) => {
     const clean = text.trim();
     if (!clean || busy || !business) return;
     setTurns((t) => [...t, { role: "caller", text: clean }]);
@@ -183,76 +186,32 @@ export function Simulator({ business }: { business: Business | null }) {
           meta: { intent: res.intent, confidence: res.confidence, outcome: res.outcome },
         },
       ]);
-      say(res.reply);
+      setBusy(false);
+      await say(res.reply);
+      // Hands-free: when the turn came in by voice, listen again as soon as the
+      // agent finishes speaking — a conversation, not a chat thread.
+      const m = micRef.current;
+      if (viaVoice && liveRef.current && composerRef.current === "voice" && !m.error) {
+        m.start();
+      }
     } catch {
+      setBusy(false);
       setTurns((t) => [
         ...t,
         { role: "agent", text: "Sorry, something went wrong reaching the agent." },
       ]);
-    } finally {
-      setBusy(false);
     }
   };
 
-  // Two mic paths: when the server has a real STT provider (Groq/OpenAI/
-  // faster-whisper) we record audio and send it to /api/transcribe — that's
-  // Whisper doing the recognition. Otherwise we use the browser's own engine.
-  const toggleMic = async () => {
-    if (sttMode === "server") return toggleServerMic();
-    return toggleBrowserMic();
-  };
-
-  const toggleServerMic = async () => {
-    if (listening) {
-      // Stop → transcribe with Whisper on the server.
-      setListening(false);
-      setTranscribing(true);
-      try {
-        const blob = await stopRecording();
-        const text = await transcribeBlob(blob);
-        if (text) {
-          setInput(text);
-          send(text);
-        }
-      } finally {
-        setTranscribing(false);
-      }
-      return;
+  // Big-button behaviour: stop while listening, interrupt while speaking,
+  // otherwise start listening.
+  const pressMic = () => {
+    if (mic.listening) return mic.stop();
+    if (speaking) {
+      cancelSpeech();
+      setSpeaking(false);
     }
-    if (!isRecordingSupported()) {
-      alert("Recording isn't available in this browser. You can type instead.");
-      return;
-    }
-    try {
-      await startRecording();
-      setListening(true);
-    } catch {
-      alert("Microphone permission is needed for voice input.");
-    }
-  };
-
-  const toggleBrowserMic = () => {
-    if (listening) {
-      recRef.current?.stop();
-      return;
-    }
-    const rec = getRecognition();
-    if (!rec) {
-      alert("Voice input needs Chrome or Edge, or configure Whisper (STT_PROVIDER).");
-      return;
-    }
-    rec.lang = business?.language || "en-US";
-    rec.interimResults = false;
-    rec.continuous = false;
-    rec.onresult = (e: any) => {
-      const text = e.results[0][0].transcript;
-      setInput(text);
-      setTimeout(() => send(text), 150);
-    };
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    rec.start();
+    mic.start();
   };
 
   return (
@@ -274,16 +233,24 @@ export function Simulator({ business }: { business: Business | null }) {
 
       <div className="mx-auto max-w-2xl">
         <div className="card overflow-hidden">
-          {/* Phone header */}
+          {/* Header */}
           <div className="flex items-center gap-3 border-b border-line bg-gradient-to-r from-brand/10 to-transparent px-5 py-4">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-brand-ink">
-              {live ? <Equalizer size={18} className="text-brand-ink" /> : <IconPhone width={20} height={20} />}
+              {live ? (
+                <Equalizer live={speaking} size={18} className="text-brand-ink" />
+              ) : (
+                <IconMic width={20} height={20} />
+              )}
             </span>
             <div className="flex-1">
               <p className="font-display font-semibold text-ink">{business?.name ?? "Sonari"}</p>
               <p className="text-xs text-ink-3">
                 {live
-                  ? "Connected · agent is listening"
+                  ? speaking
+                    ? "Agent speaking…"
+                    : mic.listening
+                      ? "Listening…"
+                      : "Connected"
                   : isReceptionist
                     ? "Ready to take your call"
                     : "Ready when you are"}
@@ -300,7 +267,11 @@ export function Simulator({ business }: { business: Business | null }) {
           {!live ? (
             <div className="grid place-items-center px-6 py-16 text-center">
               <span className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-brand/12 text-brand">
-                <IconPhone width={28} height={28} />
+                {isReceptionist ? (
+                  <IconPhone width={28} height={28} />
+                ) : (
+                  <IconMic width={28} height={28} />
+                )}
               </span>
               <p className="font-display text-lg font-semibold text-ink">
                 {isReceptionist ? "Ring, ring" : `Talk to ${business?.name ?? "your agent"}`}
@@ -308,16 +279,20 @@ export function Simulator({ business }: { business: Business | null }) {
               <p className="mt-1 max-w-sm text-sm text-ink-2">
                 {isReceptionist
                   ? "Start a call to hear your agent greet the caller, answer questions, and book appointments — all live."
-                  : "Start a conversation to hear your agent speak and answer, exactly as your users will."}
+                  : "Start a conversation and just talk — the agent listens, thinks, and answers out loud."}
               </p>
               <button className="btn-primary mt-5" onClick={startCall}>
-                <IconPhone width={16} height={16} />{" "}
+                {isReceptionist ? (
+                  <IconPhone width={16} height={16} />
+                ) : (
+                  <IconMic width={16} height={16} />
+                )}{" "}
                 {isReceptionist ? "Start call" : "Start talking"}
               </button>
             </div>
           ) : (
             <>
-              <div ref={scrollRef} className="max-h-[420px] space-y-3 overflow-y-auto p-4 sm:p-5">
+              <div ref={scrollRef} className="max-h-[380px] space-y-3 overflow-y-auto p-4 sm:p-5">
                 {turns.map((t, i) => {
                   const isAgent = t.role === "agent";
                   return (
@@ -375,55 +350,54 @@ export function Simulator({ business }: { business: Business | null }) {
                 ))}
               </div>
 
-              {/* Composer */}
-              <div className="flex items-center gap-2 border-t border-line p-3 sm:p-4">
-                <button
-                  onClick={toggleMic}
-                  disabled={transcribing || busy}
-                  className={classNames(
-                    "grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition disabled:opacity-60",
-                    listening
-                      ? "border-danger bg-danger/10 text-danger animate-pulse"
-                      : "border-line bg-surface text-ink-2 hover:bg-surface-2",
-                  )}
-                  aria-label={listening ? "Stop recording" : "Voice input"}
-                >
-                  <IconMic width={18} height={18} />
-                </button>
-                <input
-                  className="input"
-                  placeholder={
-                    transcribing
-                      ? "Transcribing…"
-                      : listening
-                        ? sttMode === "server"
-                          ? "Recording… tap the mic to stop"
-                          : "Listening…"
-                        : isReceptionist
-                          ? "Type what the caller says…"
-                          : "Type a message…"
-                  }
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && send(input)}
-                  disabled={busy}
+              {/* Composer — voice-first, typing as the fallback */}
+              {composer === "voice" ? (
+                <VoiceControls
+                  mic={mic}
+                  busy={busy}
+                  speaking={speaking}
+                  onPress={pressMic}
+                  onTextMode={() => {
+                    mic.cancel();
+                    setComposer("text");
+                  }}
                 />
-                <button
-                  className="btn-primary !px-3"
-                  onClick={() => send(input)}
-                  disabled={busy || !input.trim()}
-                  aria-label="Send"
-                >
-                  <IconSend width={18} height={18} />
-                </button>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2 border-t border-line p-3 sm:p-4">
+                  <button
+                    onClick={() => setComposer("voice")}
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink-2 transition hover:bg-surface-2"
+                    aria-label="Switch to voice"
+                    title="Switch to voice"
+                  >
+                    <IconMic width={18} height={18} />
+                  </button>
+                  <input
+                    className="input"
+                    placeholder={isReceptionist ? "Type what the caller says…" : "Type a message…"}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && send(input)}
+                    disabled={busy}
+                    autoFocus
+                  />
+                  <button
+                    className="btn-primary !px-3"
+                    onClick={() => send(input)}
+                    disabled={busy || !input.trim()}
+                    aria-label="Send"
+                  >
+                    <IconSend width={18} height={18} />
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
 
         <p className="mt-3 text-center text-xs text-ink-3">
-          {sttMode === "server"
-            ? "Voice input is transcribed by Whisper on the server."
+          {mic.mode === "server"
+            ? "Your voice is transcribed by Whisper on the server."
             : "Voice input uses your browser's speech recognition."}{" "}
           Replies are spoken by the configured voice.
         </p>

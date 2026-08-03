@@ -127,7 +127,7 @@ export function Layout({
         <div className="rounded-xl border border-line bg-surface-2/60 p-3">
           <p className="label mb-1.5">Status</p>
           <LivePill live={!!business?.agent_live} />
-          {business?.phone_number && (
+          {books && business?.phone_number && (
             <p className="mt-2 font-mono text-[11px] text-ink-3">
               {business.phone_number}
             </p>

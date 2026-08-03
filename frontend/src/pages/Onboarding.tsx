@@ -269,7 +269,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                         key={d.key}
                         className="flex items-center gap-2 rounded-lg border border-line px-3 py-2"
                       >
-                        <label className="flex w-28 shrink-0 cursor-pointer items-center gap-2 text-sm text-ink">
+                        <label className="flex w-24 shrink-0 cursor-pointer items-center gap-2 text-sm text-ink sm:w-28">
                           <input
                             type="checkbox"
                             className="accent-brand"
@@ -284,19 +284,22 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                           {d.label}
                         </label>
                         {open ? (
-                          <div className="flex flex-1 items-center gap-2">
+                          // min-w-0 + flex-1 on the inputs: a native time input has
+                          // an intrinsic min-width that would otherwise push this
+                          // row past the viewport on a phone.
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
                             <input
                               type="time"
-                              className="input !py-1.5"
+                              className="input !py-1.5 min-w-0 flex-1"
                               value={open[0]}
                               onChange={(e) =>
                                 setHours({ ...hours, [d.key]: [e.target.value, open[1]] })
                               }
                             />
-                            <span className="text-xs text-ink-3">to</span>
+                            <span className="shrink-0 text-xs text-ink-3">to</span>
                             <input
                               type="time"
-                              className="input !py-1.5"
+                              className="input !py-1.5 min-w-0 flex-1"
                               value={open[1]}
                               onChange={(e) =>
                                 setHours({ ...hours, [d.key]: [open[0], e.target.value] })

@@ -137,7 +137,7 @@ export default function App() {
         <Route path="calls/:id" element={<CallDetail />} />
         <Route path="bookings" element={<Bookings business={business} />} />
         <Route path="knowledge" element={<Knowledge />} />
-        <Route path="analytics" element={<Analytics />} />
+        <Route path="analytics" element={<Analytics business={business} />} />
         <Route path="simulator" element={<Simulator business={business} />} />
         <Route path="settings" element={<Settings business={business} onSaved={refetchAll} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -58,6 +58,11 @@ export function Settings({
   if (!business || !draft)
     return <PageHeader title="Settings" subtitle="Loading…" />;
 
+  // Receptionist-only surface (phone line, escalation, services, bookings) is
+  // keyed off the SAVED agent, not the draft, so sections don't pop in and out
+  // while someone is mid-edit in the instructions box.
+  const books = !business.system_prompt;
+
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) =>
     setDraft((d) => (d ? { ...d, [k]: v } : d));
 
@@ -66,15 +71,17 @@ export function Settings({
     setSaved(false);
     try {
       await api.patch("/businesses/me", draft);
-      await api.put(
-        "/businesses/me/services",
-        services.map((s) => ({
-          name: s.name,
-          duration_min: s.duration_min,
-          price: s.price,
-          description: s.description,
-        })),
-      );
+      if (books) {
+        await api.put(
+          "/businesses/me/services",
+          services.map((s) => ({
+            name: s.name,
+            duration_min: s.duration_min,
+            price: s.price,
+            description: s.description,
+          })),
+        );
+      }
       onSaved();
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -93,7 +100,11 @@ export function Settings({
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Tune how your agent answers, books, and escalates."
+        subtitle={
+          books
+            ? "Tune how your agent answers, books, and escalates."
+            : "Tune how your agent behaves, sounds, and is shared."
+        }
         actions={
           <button className="btn-primary" onClick={save} disabled={saving}>
             {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
@@ -130,7 +141,9 @@ export function Settings({
               </p>
               <p className="text-xs text-ink-3">
                 {draft.agent_live
-                  ? "Answering on the web agent and any connected phone line"
+                  ? books
+                    ? "Answering on the web agent and any connected phone line"
+                    : "Answering on your shared agent page"
                   : "Not answering"}
               </p>
             </div>
@@ -142,6 +155,7 @@ export function Settings({
           </div>
         </Section>
 
+        {books && (
         <Section
           title="Phone calls (optional add-on)"
           desc="Connect a real phone number so the agent also answers calls. Not required — the shareable web agent above works on its own."
@@ -177,13 +191,17 @@ export function Settings({
             </div>
           </div>
         </Section>
+        )}
 
-        <Section title="Business info" desc="How the agent introduces you.">
+        <Section
+          title={books ? "Business info" : "Agent info"}
+          desc={books ? "How the agent introduces you." : "How your agent introduces itself."}
+        >
           <div className="space-y-3">
-            <Field label="Business name">
+            <Field label={books ? "Business name" : "Agent name"}>
               <input className="input" value={draft.name} onChange={(e) => set("name", e.target.value)} />
             </Field>
-            <Field label="Industry">
+            <Field label={books ? "Industry" : "Category (shown on the public page)"}>
               <input
                 className="input"
                 value={draft.industry ?? ""}
@@ -213,6 +231,7 @@ export function Settings({
           </div>
         </Section>
 
+        {books && (
         <Section title="Escalation" desc="Where callers go when they need a human.">
           <div className="space-y-3">
             <Field label="Owner phone (read out on escalation)">
@@ -242,7 +261,9 @@ export function Settings({
             </Field>
           </div>
         </Section>
+        )}
 
+        {books && (
         <Section title="Booking rules" desc="Guardrails for the calendar.">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Max per day">
@@ -263,7 +284,9 @@ export function Settings({
             </Field>
           </div>
         </Section>
+        )}
 
+        {books && (
         <Section title="Services" desc="What can be booked, and for how long.">
           <div className="space-y-2">
             {services.map((s, i) => (
@@ -312,6 +335,7 @@ export function Settings({
             </button>
           </div>
         </Section>
+        )}
 
         <Section title="Voice" desc="Pick how your agent sounds. Preview plays the live TTS.">
           <VoicePicker
@@ -339,6 +363,7 @@ export function Settings({
           )}
         </Section>
 
+        {books && (
         <Section title="Menu preview" desc="A quick look at bookable services.">
           <ul className="divide-y divide-line text-sm">
             {services.map((s) => (
@@ -351,10 +376,15 @@ export function Settings({
             ))}
           </ul>
         </Section>
+        )}
 
         <Section
           title="Start over"
-          desc="Erase this business and run setup again from scratch."
+          desc={
+            books
+              ? "Erase this business and run setup again from scratch."
+              : "Erase this agent and start again from scratch."
+          }
         >
           <StartOver onReset={onSaved} />
         </Section>

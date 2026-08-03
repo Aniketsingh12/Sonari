@@ -37,44 +37,49 @@ interface Line {
   text: string;
 }
 
+// A scripted example, but the voice is really synthesized by the configured TTS
+// engine — deliberately generic so it reads as "any agent", not a receptionist.
 const SCRIPT: Line[] = [
-  { role: "agent", text: "Thanks for calling! How can I help you today?" },
-  { role: "caller", text: "Hi — do you have anything Tuesday morning?" },
-  { role: "agent", text: "We do, ten o'clock is open. Can I take your name?" },
-  { role: "caller", text: "It's Sam." },
-  { role: "agent", text: "Perfect Sam, you're booked for Tuesday at ten." },
+  { role: "agent", text: "Hi! I'm your agent. What would you like to go over?" },
+  { role: "caller", text: "Can you explain what an API is?" },
+  {
+    role: "agent",
+    text: "Sure — think of it as a waiter between two programs. One asks for something, the API carries the request and brings the answer back.",
+  },
+  { role: "caller", text: "That actually makes sense." },
+  { role: "agent", text: "Great. Want me to walk through a real example next?" },
 ];
 
 const FEATURES = [
   {
-    icon: IconPhone,
-    title: "Answers every call",
-    body: "Picks up on the first ring, day or night. No hold music, no voicemail.",
-  },
-  {
-    icon: IconCalendar,
-    title: "Books appointments",
-    body: "Checks what's free, takes the booking, and writes it to your calendar.",
+    icon: IconWand,
+    title: "Instructions are the agent",
+    body: "Describe how it should behave and it does — a tutor teaches, a support agent supports. No flowcharts.",
   },
   {
     icon: IconBook,
-    title: "Knows your business",
-    body: "Answers questions about prices, hours, and policies from your own knowledge base.",
-  },
-  {
-    icon: IconMessage,
-    title: "Takes messages",
-    body: "Catches the details you'd want, then sends you a summary after the call.",
+    title: "Give it your knowledge",
+    body: "Drop in the questions people actually ask; the agent answers from them, in its own words.",
   },
   {
     icon: IconUser,
-    title: "Knows when to step aside",
-    body: "Hands callers to a real person when they ask, or when it isn't confident.",
+    title: "Share it anywhere",
+    body: "Every agent gets a public page and an embed snippet. No phone number, no login for visitors.",
   },
   {
-    icon: IconWand,
-    title: "Shows its work",
-    body: "Every call transcribed, with recordings, outcomes, and what it decided.",
+    icon: IconMessage,
+    title: "Speaks and listens",
+    body: "Real voice both ways in the browser, in six languages, with the voice you pick.",
+  },
+  {
+    icon: IconPhone,
+    title: "Phone calls when you need them",
+    body: "Optional add-on: connect a Twilio or Exotel number and the same agent answers your line.",
+  },
+  {
+    icon: IconCalendar,
+    title: "Or run a receptionist",
+    body: "Pick the receptionist template and it books appointments, takes messages, and escalates to you.",
   },
 ];
 
@@ -140,14 +145,14 @@ export function Landing({
             </span>
 
             <h1 className="mt-5 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl">
-              Every customer answered,
-              <span className="text-brand"> day or night.</span>
+              Build a voice agent
+              <span className="text-brand"> people can talk to.</span>
             </h1>
 
             <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-2 sm:text-lg">
-              Sonari is a voice AI agent that talks to your customers — on your
-              website or your phone line — answering what they ask and booking them
-              in, in a real conversation.
+              Describe what it should do — tutor, coding helper, support agent,
+              receptionist — and Sonari turns it into an agent that speaks and
+              listens. Share it as a link, embed it, or put it on a phone line.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -172,7 +177,8 @@ export function Landing({
             </div>
 
             <p className="mt-4 text-xs text-ink-3">
-              Works for any business that books time — clinics, salons, trades, legal.
+              Start from a template — assistant, tutor, coding helper, support,
+              coach, interviewer, or receptionist.
             </p>
 
             {error && (
@@ -193,10 +199,10 @@ export function Landing({
       {/* ---------------- Features ---------------- */}
       <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <h2 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          What it handles while you work
+          One engine, any kind of agent
         </h2>
         <p className="mt-2 max-w-xl text-ink-2">
-          Everything a good receptionist does on the phone — without the hold music.
+          The same speech → reasoning → speech pipeline, pointed wherever you need it.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -279,11 +285,11 @@ export function Landing({
       {/* ---------------- Close ---------------- */}
       <section className="mx-auto max-w-5xl px-4 py-16 text-center sm:px-6">
         <h2 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          Ready to stop missing calls?
+          Ready to build your first agent?
         </h2>
         <p className="mx-auto mt-2 max-w-md text-ink-2">
-          Setup takes about two minutes. Tell it about your business, and it starts
-          answering.
+          Takes about two minutes. Pick a template, tell it how to behave, and start
+          talking to it.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           {configured ? (
@@ -374,15 +380,15 @@ function DemoCall() {
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-sm font-medium text-ink">+1 (555) 0134</p>
+          <p className="text-sm font-medium text-ink">Sample agent</p>
           <p className="text-xs text-ink-3">
             {phase === "idle"
-              ? "Incoming call"
+              ? "Ready to talk"
               : phase === "live"
                 ? speaking
                   ? "Agent speaking…"
                   : "Listening…"
-                : "Call ended · 24s"}
+                : "Conversation ended"}
           </p>
         </div>
         {phase !== "idle" && (
@@ -400,13 +406,14 @@ function DemoCall() {
       {phase === "idle" ? (
         <div className="grid place-items-center px-6 py-12 text-center">
           <p className="font-display text-lg font-semibold text-ink">
-            Your phone is ringing.
+            Hear one talk.
           </p>
           <p className="mt-1 max-w-xs text-sm text-ink-2">
-            Answer it and hear exactly what your caller would hear.
+            Play a sample conversation — spoken out loud by the voice engine
+            you've configured.
           </p>
           <button className="btn-primary mt-5" onClick={answer}>
-            <IconPlay width={15} height={15} /> Answer the call
+            <IconPlay width={15} height={15} /> Play conversation
           </button>
           <p className="mt-3 text-[11px] text-ink-3">Turn your sound on</p>
         </div>
@@ -456,7 +463,7 @@ function DemoCall() {
                   <IconCheck width={13} height={13} />
                 </span>
                 <p className="text-sm font-medium text-good">
-                  Booking created · Tuesday, 10:00 AM
+                  Answered from the agent's own knowledge
                 </p>
               </div>
               <button className="btn-ghost w-full justify-center" onClick={answer}>

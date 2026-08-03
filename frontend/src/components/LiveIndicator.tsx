@@ -56,7 +56,7 @@ export function LivePill({ live }: { live: boolean }) {
       )}
     >
       <Equalizer live={live} size={14} className={live ? "text-signal" : "text-ink-3"} />
-      {live ? "Line live" : "Paused"}
+      {live ? "Live" : "Paused"}
     </span>
   );
 }

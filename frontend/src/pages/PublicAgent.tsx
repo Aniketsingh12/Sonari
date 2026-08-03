@@ -1,26 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "@/api/client";
 import type { SimulateTurnResult } from "@/api/types";
 import { Equalizer } from "@/components/LiveIndicator";
-import { IconMic, IconSend, IconUser, IconX } from "@/components/icons";
+import { VoiceControls } from "@/components/VoiceControls";
+import { IconMic, IconSend, IconUser } from "@/components/icons";
 import { classNames } from "@/lib/format";
-import {
-  cancelSpeech,
-  getSttMode,
-  isRecordingSupported,
-  speak,
-  startRecording,
-  stopRecording,
-  transcribeBlob,
-  type SpeechMode,
-} from "@/lib/speech";
+import { useMic } from "@/lib/useMic";
+import { cancelSpeech, speak } from "@/lib/speech";
 
 // The public, embeddable voice agent. A business shares /agent/:id (or drops it
 // in an <iframe>) and anyone can talk to their assistant — no dashboard, no
-// login. Same STT → reasoning → TTS pipeline as the internal simulator; the
-// only difference is it fetches its config from the unauthenticated
-// /businesses/:id/agent endpoint and speaks in the business's own voice.
+// login. Voice-first: the big mic is the way in, typing is the fallback, and
+// after the agent speaks it listens again so the exchange flows hands-free.
 
 interface AgentConfig {
   id: string;
@@ -37,21 +29,6 @@ interface Turn {
   text: string;
 }
 
-type SpeechRec = {
-  start: () => void;
-  stop: () => void;
-  onresult: ((e: any) => void) | null;
-  onend: (() => void) | null;
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-};
-function getRecognition(): SpeechRec | null {
-  const w = window as any;
-  const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-  return Ctor ? new Ctor() : null;
-}
-
 export function PublicAgent() {
   const { businessId = "" } = useParams();
   const [config, setConfig] = useState<AgentConfig | null>(null);
@@ -61,11 +38,23 @@ export function PublicAgent() {
   const [input, setInput] = useState("");
   const [callId, setCallId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [sttMode, setSttMode] = useState<SpeechMode>("browser");
-  const recRef = useRef<SpeechRec | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const [composer, setComposer] = useState<"voice" | "text">("voice");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const configRef = useRef<AgentConfig | null>(null);
+  const liveRef = useRef(live);
+  const composerRef = useRef(composer);
+  configRef.current = config;
+  liveRef.current = live;
+  composerRef.current = composer;
+
+  const mic = useMic({
+    language: config?.language,
+    onText: (text) => void send(text, true),
+  });
+  const micRef = useRef(mic);
+  micRef.current = mic;
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +62,6 @@ export function PublicAgent() {
       .get<AgentConfig>(`/businesses/${businessId}/agent`)
       .then((c) => !cancelled && (setConfig(c), setStatus("ready")))
       .catch(() => !cancelled && setStatus("notfound"));
-    getSttMode().then((m) => !cancelled && setSttMode(m));
     return () => {
       cancelled = true;
       cancelSpeech();
@@ -84,93 +72,62 @@ export function PublicAgent() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [turns]);
 
-  const say = (text: string) =>
-    speak(text, { voiceId: config?.voice_id, lang: config?.language });
+  const say = async (text: string) => {
+    setSpeaking(true);
+    try {
+      const c = configRef.current;
+      await speak(text, { voiceId: c?.voice_id, lang: c?.language });
+    } finally {
+      setSpeaking(false);
+    }
+  };
 
   const start = () => {
     if (!config) return;
     setLive(true);
     setTurns([{ role: "agent", text: config.greeting }]);
-    say(config.greeting);
+    void say(config.greeting);
   };
 
-  const send = async (text: string) => {
+  const send = async (text: string, viaVoice = false) => {
     const clean = text.trim();
-    if (!clean || busy || !config) return;
+    const c = configRef.current;
+    if (!clean || !c) return;
     setTurns((t) => [...t, { role: "caller", text: clean }]);
     setInput("");
     setBusy(true);
     try {
       const res = await api.post<SimulateTurnResult>("/simulate/turn", {
-        business_id: config.id,
+        business_id: c.id,
         call_id: callId,
         text: clean,
       });
       setCallId(res.call_id);
       setTurns((t) => [...t, { role: "agent", text: res.reply }]);
-      say(res.reply);
+      setBusy(false);
+      await say(res.reply);
+      // Hands-free loop: keep the conversation going by voice.
+      const m = micRef.current;
+      if (viaVoice && liveRef.current && composerRef.current === "voice" && !m.error) {
+        m.start();
+      }
     } catch {
+      setBusy(false);
       setTurns((t) => [
         ...t,
         { role: "agent", text: "Sorry, I had trouble answering just now. Please try again." },
       ]);
-    } finally {
-      setBusy(false);
     }
   };
 
-  // Real-STT (server Whisper) when configured, else the browser's own engine.
-  const toggleMic = () => (sttMode === "server" ? toggleServerMic() : toggleBrowserMic());
-
-  const toggleServerMic = async () => {
-    if (listening) {
-      setListening(false);
-      setTranscribing(true);
-      try {
-        const text = await transcribeBlob(await stopRecording());
-        if (text) send(text);
-      } finally {
-        setTranscribing(false);
-      }
-      return;
+  const pressMic = () => {
+    if (mic.listening) return mic.stop();
+    if (speaking) {
+      cancelSpeech();
+      setSpeaking(false);
     }
-    if (!isRecordingSupported()) {
-      alert("Recording isn't available in this browser — you can type instead.");
-      return;
-    }
-    try {
-      await startRecording();
-      setListening(true);
-    } catch {
-      alert("Microphone permission is needed for voice input.");
-    }
+    mic.start();
   };
-
-  const toggleBrowserMic = () => {
-    if (listening) return recRef.current?.stop();
-    const rec = getRecognition();
-    if (!rec) {
-      alert("Voice input needs Chrome or Edge — you can type instead.");
-      return;
-    }
-    rec.lang = config?.language || "en-US";
-    rec.interimResults = false;
-    rec.continuous = false;
-    rec.onresult = (e: any) => {
-      const text = e.results[0][0].transcript;
-      setInput(text);
-      setTimeout(() => send(text), 150);
-    };
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    rec.start();
-  };
-
-  const shell = useMemo(
-    () => "mx-auto flex min-h-screen w-full max-w-lg flex-col bg-bg px-4 py-6 sm:py-10",
-    [],
-  );
 
   if (status === "loading") {
     return (
@@ -194,16 +151,16 @@ export function PublicAgent() {
   }
 
   return (
-    <div className={shell}>
+    <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col bg-bg px-4 py-6 sm:py-10">
       {/* Header */}
       <div className="flex items-center gap-3 px-1">
         <span className="grid h-11 w-11 place-items-center rounded-full bg-brand text-brand-ink">
-          <Equalizer live={live} size={18} className="text-brand-ink" />
+          <Equalizer live={speaking} size={18} className="text-brand-ink" />
         </span>
         <div className="min-w-0">
           <p className="truncate font-display text-lg font-bold text-ink">{config.name}</p>
           <p className="text-xs text-ink-3">
-            {config.industry ? `${config.industry} · ` : ""}Voice assistant
+            {config.industry ? `${config.industry} · ` : ""}Voice agent
           </p>
         </div>
       </div>
@@ -214,18 +171,18 @@ export function PublicAgent() {
           <div className="grid flex-1 place-items-center p-8 text-center">
             <div>
               <span className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-brand/12 text-brand">
-                <Equalizer size={26} className="text-brand" />
+                <IconMic width={26} height={26} />
               </span>
               <p className="font-display text-lg font-semibold text-ink">
                 Talk to {config.name}
               </p>
               <p className="mx-auto mt-1 max-w-xs text-sm text-ink-2">
                 {config.agent_type === "receptionist"
-                  ? "Ask a question, book an appointment, or leave a message — by voice or text."
-                  : "Ask anything, by voice or text — replies are spoken out loud."}
+                  ? "Ask a question, book an appointment, or leave a message — just talk."
+                  : "Just talk — it listens, thinks, and answers out loud. Typing works too."}
               </p>
               <button className="btn-primary mt-5" onClick={start}>
-                Start talking
+                <IconMic width={16} height={16} /> Start talking
               </button>
               <p className="mt-3 text-[11px] text-ink-3">Turn your sound on to hear replies</p>
             </div>
@@ -270,40 +227,47 @@ export function PublicAgent() {
               )}
             </div>
 
-            {/* Composer */}
-            <div className="flex items-center gap-2 border-t border-line p-3 sm:p-4">
-              <button
-                onClick={toggleMic}
-                disabled={transcribing || busy}
-                className={classNames(
-                  "grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition disabled:opacity-60",
-                  listening
-                    ? "animate-pulse border-danger bg-danger/10 text-danger"
-                    : "border-line bg-surface text-ink-2 hover:bg-surface-2",
-                )}
-                aria-label={listening ? "Stop recording" : "Voice input"}
-              >
-                {listening ? <IconX width={18} height={18} /> : <IconMic width={18} height={18} />}
-              </button>
-              <input
-                className="input"
-                placeholder={
-                  transcribing ? "Transcribing…" : listening ? "Listening…" : "Type a message…"
-                }
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send(input)}
-                disabled={busy}
+            {/* Composer — voice-first, typing as the fallback */}
+            {composer === "voice" ? (
+              <VoiceControls
+                mic={mic}
+                busy={busy}
+                speaking={speaking}
+                onPress={pressMic}
+                onTextMode={() => {
+                  mic.cancel();
+                  setComposer("text");
+                }}
               />
-              <button
-                className="btn-primary !px-3"
-                onClick={() => send(input)}
-                disabled={busy || !input.trim()}
-                aria-label="Send"
-              >
-                <IconSend width={18} height={18} />
-              </button>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 border-t border-line p-3 sm:p-4">
+                <button
+                  onClick={() => setComposer("voice")}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-surface text-ink-2 transition hover:bg-surface-2"
+                  aria-label="Switch to voice"
+                  title="Switch to voice"
+                >
+                  <IconMic width={18} height={18} />
+                </button>
+                <input
+                  className="input"
+                  placeholder="Type a message…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && send(input)}
+                  disabled={busy}
+                  autoFocus
+                />
+                <button
+                  className="btn-primary !px-3"
+                  onClick={() => send(input)}
+                  disabled={busy || !input.trim()}
+                  aria-label="Send"
+                >
+                  <IconSend width={18} height={18} />
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
