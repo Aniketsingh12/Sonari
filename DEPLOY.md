@@ -13,6 +13,15 @@ no API keys and no cost. Flip on real AI later by setting one env var.
 > `ADMIN_PASSWORD` (as a secret) on your host — it takes effect immediately, and
 > shared voice-agent links keep working without it.
 
+> ### 🎙️ The microphone needs HTTPS
+> Sonari is voice-first — talking to an agent means the browser captures the
+> mic, and browsers refuse microphone access on any origin that isn't `https://`
+> or `localhost`. Render, Railway and Fly all give you HTTPS automatically, so
+> this is a non-issue there. It only bites on **Option 3** below if you stop at
+> plain `http://your-vps-ip:8000` — put a TLS-terminating reverse proxy (Caddy,
+> nginx + certbot, or a platform load balancer) in front before relying on
+> voice input. Typing still works over plain HTTP either way.
+
 ---
 
 ## Option 1 — Render (near one-click)
@@ -27,13 +36,45 @@ The repo includes [`render.yaml`](render.yaml).
 Health checks hit `/api/health`. The free plan sleeps on inactivity and
 cold-starts on the next request (the first hit after a nap is slow).
 
-## Option 2 — Railway
+## Option 2 — Railway (recommended if you want it always-on)
 
-Railway auto-detects the `Dockerfile`.
+The repo includes [`railway.toml`](railway.toml), which pins the Dockerfile
+build, the `/api/health` healthcheck, and a 30s drain so a redeploy doesn't cut
+someone off mid-conversation. Railway never sleeps and its Postgres is one
+click, which is the main reason to pick it over Render's free tier.
 
-1. **New Project → Deploy from GitHub repo.**
-2. Railway builds and runs it, injecting `PORT` (the image honours it).
-3. Add env vars as needed (see below), then generate a domain.
+1. **New Project → Deploy from GitHub repo** → select your repo.
+2. Railway reads `railway.toml`, builds the Dockerfile, and injects `$PORT`
+   (the image honours it). **Settings → Networking → Generate Domain** to get
+   your HTTPS URL.
+3. **Variables tab** — Railway has no equivalent of `render.yaml`'s env block,
+   so set these by hand:
+
+   | Variable | Value |
+   |---|---|
+   | `ADMIN_PASSWORD` | something long and random — **set this before sharing the URL** |
+   | `LLM_PROVIDER` | `gemini` (or leave unset for the keyless mock) |
+   | `GEMINI_API_KEY` | free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+   | `EMBEDDING_PROVIDER` | `gemini` |
+
+4. **Add Postgres so your agents survive redeploys.** *New → Database →
+   Add PostgreSQL*, then on the app service add a variable:
+
+   ```
+   DATABASE_URL = ${{Postgres.DATABASE_URL}}
+   ```
+
+   That reference syntax is Railway-specific — it wires the two services
+   together. Railway hands out a `postgresql://` URL; the app rewrites it to the
+   async driver automatically, and `asyncpg` is already in the image.
+
+Without step 4 the app falls back to SQLite on the container disk, which
+**Railway wipes on every redeploy** — your agents would vanish.
+
+You don't need to set `PUBLIC_BASE_URL`: the app reads Railway's injected
+`RAILWAY_PUBLIC_DOMAIN`, so telephony callback URLs (e.g. the Exotel
+`wss://…/exotel/media` endpoint) resolve themselves. Set it only to override —
+for example when tunnelling to your laptop with ngrok.
 
 ## Option 3 — Any Docker host / VPS / Fly.io
 
@@ -74,7 +115,7 @@ Everything has a working default. The ones you might set in production:
 | `TTS_PROVIDER` | `mock` | `elevenlabs` for phone-call voice (browser demo already speaks) |
 | `ELEVENLABS_API_KEY` | — | Needed for ElevenLabs |
 | `SEED_DEMO_DATA` | `false` | `true` to auto-load the sample business on boot |
-| `PUBLIC_BASE_URL` | localhost | Set to your live URL for Twilio media-stream callbacks |
+| `PUBLIC_BASE_URL` | auto | Only needed to override. On Railway/Render the app reads the injected `RAILWAY_PUBLIC_DOMAIN` / `RENDER_EXTERNAL_URL` for telephony callback URLs |
 
 ### Real AI in the cloud — for free
 
@@ -108,8 +149,13 @@ at no cost. Prefer paid models? `LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
 
   (On Render, add `INSTALL_PIPER=true` as a Docker build arg / or set it in the
   Dockerfile.) This adds ~60MB for the voice model.
+- **Cheap paid, and phone-call capable: Fish Audio.** `TTS_PROVIDER=fish` +
+  `FISH_API_KEY` (free key at [fish.audio](https://fish.audio/app/developers/)).
+  Roughly 10x cheaper than ElevenLabs, and — unlike ElevenLabs — returns WAV, so
+  it also works on real Twilio/Exotel calls with nothing extra to install.
 - **Best quality: ElevenLabs (paid).** `TTS_PROVIDER=elevenlabs` +
-  `ELEVENLABS_API_KEY`.
+  `ELEVENLABS_API_KEY`. Browser-only: it returns MP3, which the phone-call
+  streaming path can't decode, so it never plays on a real call.
 
 Note: browser voices can't play down a phone line — real Twilio calls need Piper
 or ElevenLabs.

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/exotel", tags=["telephony"])
 
 
 def _media_ws_url() -> str:
-    base = settings.public_base_url
+    base = settings.effective_base_url
     if base.startswith("https"):
         scheme_rest = "wss" + base[len("https") :]
     elif base.startswith("http"):

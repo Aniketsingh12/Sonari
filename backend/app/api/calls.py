@@ -51,7 +51,7 @@ async def incoming_call(
     lang = escape(biz.language or "en-US")  # BCP-47, used by both STT and TTS
 
     if USE_MEDIA_STREAM:
-        ws_url = settings.public_base_url.replace("http", "ws", 1) + "/media/twilio"
+        ws_url = settings.effective_base_url.replace("http", "ws", 1) + "/media/twilio"
         return _twiml(
             f'<Say language="{lang}">{greeting}</Say>'
             f'<Connect><Stream url="{escape(ws_url)}">'

@@ -1,0 +1,27 @@
+# Railway config-as-code. Railway would auto-detect the Dockerfile on its own;
+# this pins the parts that matter for a voice app so deploys are predictable.
+#
+# Env vars are NOT declared here (Railway has no equivalent of render.yaml's
+# envVars block) — set them in the service's Variables tab. See DEPLOY.md for
+# the list, and set ADMIN_PASSWORD before the service is public.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# FastAPI serves both the API and the built SPA, so this one path proves the
+# whole container is up. No startCommand: the Dockerfile's CMD already expands
+# Railway's injected $PORT.
+healthcheckPath = "/api/health"
+# Generous: the first boot creates database tables before the app starts
+# answering requests.
+healthcheckTimeout = 300
+
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+# Voice conversations hold a request (and telephony holds a WebSocket) for
+# several seconds. Give in-flight turns time to finish on redeploy instead of
+# cutting someone off mid-sentence.
+drainingSeconds = 30

@@ -30,10 +30,31 @@ class Settings(BaseSettings):
     app_name: str = "Sonari"
     environment: Literal["development", "production", "test"] = "development"
     debug: bool = True
-    # Public base URL of this backend (used to build Twilio media-stream URLs).
-    public_base_url: str = "http://localhost:8000"
+    # Public base URL of this backend (used to build telephony stream URLs).
+    public_base_url: str = "http://localhost:8100"
+    # Injected automatically by the host — used when PUBLIC_BASE_URL is left at
+    # its local default, so a deploy resolves its own public URL.
+    railway_public_domain: str | None = None   # Railway: "app.up.railway.app"
+    render_external_url: str | None = None     # Render:  "https://app.onrender.com"
     # Comma-separated list of allowed CORS origins for the frontend.
     cors_origins: str = "http://localhost:5273,http://localhost:3000"
+
+    @property
+    def effective_base_url(self) -> str:
+        """The URL the outside world reaches this app on.
+
+        An explicit non-local PUBLIC_BASE_URL always wins. Otherwise fall back to
+        whatever the platform injected, so Twilio/Exotel callback URLs are right
+        on Railway and Render without anyone setting a variable by hand.
+        """
+        explicit = self.public_base_url.strip().rstrip("/")
+        if explicit and "localhost" not in explicit and "127.0.0.1" not in explicit:
+            return explicit
+        if self.railway_public_domain:
+            return f"https://{self.railway_public_domain.strip().rstrip('/')}"
+        if self.render_external_url:
+            return self.render_external_url.strip().rstrip("/")
+        return explicit
 
     # ---- Dashboard access ----
     # Password for the owner dashboard. Empty (the default) leaves the dashboard
