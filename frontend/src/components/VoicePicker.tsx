@@ -4,6 +4,7 @@ import { languageBase } from "@/lib/languages";
 import {
   cancelSpeech,
   getSpeechMode,
+  getTtsProvider,
   listVoices,
   speak,
   type SpeechMode,
@@ -39,6 +40,7 @@ export function VoicePicker({
 }) {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [mode, setMode] = useState<SpeechMode>("browser");
+  const [provider, setProvider] = useState("mock");
   const [previewing, setPreviewing] = useState<string | null>(null);
 
   const base = languageBase(language);
@@ -46,6 +48,7 @@ export function VoicePicker({
   useEffect(() => {
     listVoices(base).then(setVoices);
     getSpeechMode().then(setMode);
+    getTtsProvider().then(setProvider);
     return () => cancelSpeech();
   }, [base]);
 
@@ -54,6 +57,13 @@ export function VoicePicker({
     await speak(SAMPLES[base] ?? SAMPLES.en, { voiceId: id, lang: language });
     setPreviewing(null);
   };
+
+  // Fish Audio picks a voice by opaque "reference id", not by name — so a list
+  // of names would be fiction (every entry would play the same voice). Take the
+  // id directly instead.
+  if (provider === "fish") {
+    return <VoiceIdPicker value={value} onChange={onChange} onPreview={preview} previewing={previewing !== null} />;
+  }
 
   if (!voices.length) {
     return <p className="text-sm text-ink-3">No voices available on this device.</p>;
@@ -108,10 +118,73 @@ export function VoicePicker({
       {mode === "browser" && (
         <p className="mt-3 text-xs text-ink-3">
           These are your device's built-in voices, used because no TTS engine is
-          configured. Set <code className="font-mono">TTS_PROVIDER</code> to
-          piper or elevenlabs for voices your phone callers will hear.
+          configured — so everyone who opens your agent hears whatever voice
+          <em> their </em> device has. Set{" "}
+          <code className="font-mono">TTS_PROVIDER</code> to{" "}
+          <code className="font-mono">fish</code> or{" "}
+          <code className="font-mono">piper</code> to give every listener the
+          same voice.
         </p>
       )}
+    </div>
+  );
+}
+
+/** Fish Audio: the agent's voice is a reference id copied from fish.audio. */
+function VoiceIdPicker({
+  value,
+  onChange,
+  onPreview,
+  previewing,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+  onPreview: (id: string) => void;
+  previewing: boolean;
+}) {
+  // Anything that isn't a Fish reference id (a leftover browser voice, say) is
+  // ignored by the backend, so show the field empty rather than implying it's in use.
+  const isFishId = /^[0-9a-f]{16,}$/i.test(value.trim());
+  const shown = isFishId ? value : "";
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <input
+          className="input font-mono"
+          placeholder="Voice ID from fish.audio (blank = default voice)"
+          value={shown}
+          onChange={(e) => onChange(e.target.value.trim())}
+        />
+        <button
+          type="button"
+          className="btn-outline !py-2 shrink-0"
+          onClick={() => onPreview(shown)}
+          aria-label="Preview voice"
+        >
+          {previewing ? (
+            <Equalizer live size={15} className="text-brand" />
+          ) : (
+            <IconPlay width={14} height={14} />
+          )}
+          Preview
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-ink-3">
+        Browse voices at{" "}
+        <a
+          href="https://fish.audio/discovery"
+          target="_blank"
+          rel="noreferrer"
+          className="text-brand hover:underline"
+        >
+          fish.audio
+        </a>
+        , open one, and paste its model ID here — that's the voice this agent
+        speaks with. Leave it blank to use the{" "}
+        <code className="font-mono">FISH_VOICE_ID</code> default from your
+        backend config.
+      </p>
     </div>
   );
 }

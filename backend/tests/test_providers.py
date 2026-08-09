@@ -42,13 +42,27 @@ def test_fish_reports_available_with_a_key(monkeypatch):
     assert "s1" in detail
 
 
-@pytest.mark.parametrize("placeholder", ["default", "rachel", "Amy", "MARCUS", "", None])
-def test_fish_ignores_the_uis_placeholder_voice_ids(monkeypatch, placeholder):
-    """The voice picker sends ids like "default"/"rachel" (and browser voiceURIs).
-    Those are not Fish reference ids — sending one would fail the request, so the
-    configured voice must win instead."""
+@pytest.mark.parametrize(
+    "not_a_fish_id",
+    [
+        "default",
+        "rachel",
+        "Amy",
+        "MARCUS",
+        "",
+        None,
+        # A leftover browser voiceURI, which is what an agent created while
+        # TTS_PROVIDER=mock actually has stored in voice_id.
+        "Microsoft David - English (United States)",
+        "com.apple.voice.compact.en-US.Samantha",
+        "short1234",  # hex but too short to be a reference id
+    ],
+)
+def test_fish_ignores_voice_ids_that_arent_fish_references(monkeypatch, not_a_fish_id):
+    """Only a real Fish reference id may be sent; everything else falls back to
+    the configured voice, otherwise the request fails."""
     monkeypatch.setattr(settings, "fish_voice_id", "802e3bc2b27e49c2995d23ef70e6ac89")
-    assert FishAudioTTS()._reference_id(placeholder) == (
+    assert FishAudioTTS()._reference_id(not_a_fish_id) == (
         "802e3bc2b27e49c2995d23ef70e6ac89"
     )
 

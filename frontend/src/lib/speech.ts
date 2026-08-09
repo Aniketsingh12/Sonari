@@ -38,6 +38,22 @@ export function getSpeechMode(): Promise<SpeechMode> {
 export function resetSpeechMode() {
   modePromise = null;
   sttModePromise = null;
+  ttsProviderPromise = null;
+}
+
+// Which engine is actually speaking. The voice *picker* needs this: engines
+// differ in how a voice is chosen — the browser has named system voices, while
+// Fish Audio takes an opaque voice ("reference") id you copy from their site.
+let ttsProviderPromise: Promise<string> | null = null;
+
+export function getTtsProvider(): Promise<string> {
+  if (!ttsProviderPromise) {
+    ttsProviderPromise = fetch("/api/health")
+      .then((r) => (r.ok ? (r.json() as Promise<Health>) : null))
+      .then((h) => h?.providers.find((p) => p.kind === "tts")?.provider ?? "mock")
+      .catch(() => "mock");
+  }
+  return ttsProviderPromise;
 }
 
 // ---------------------------------------------------------------- listening

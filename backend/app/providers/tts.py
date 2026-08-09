@@ -125,10 +125,16 @@ class ElevenLabsTTS(TTSProvider):
         return True, f"voice={settings.elevenlabs_voice_id}"
 
 
-# Placeholder ids from the UI's built-in voice list (lib/speech.ts SERVER_VOICES)
-# and the browser's own voiceURIs. They are not Fish voice ("reference") ids, so
-# sending one as reference_id would fail — fall back to the configured voice.
-_NON_FISH_VOICE_IDS = {"default", "rachel", "amy", "marcus"}
+def _looks_like_fish_voice_id(value: str) -> bool:
+    """Fish "reference" ids are long hex strings (e.g. 802e3bc2b27e…).
+
+    Anything else reaching us is a leftover from another voice source — the UI's
+    placeholder ids, or a browser voiceURI like "Microsoft David - English
+    (United States)". Sending one of those as reference_id fails the request, so
+    we detect the real shape rather than blocklisting known-bad values.
+    """
+    v = value.strip()
+    return len(v) >= 16 and all(c in "0123456789abcdefABCDEF" for c in v)
 
 
 class FishAudioTTS(TTSProvider):
@@ -143,8 +149,10 @@ class FishAudioTTS(TTSProvider):
     content_type = "audio/wav"
 
     def _reference_id(self, voice: str | None) -> str:
+        """Which Fish voice to speak with: the agent's own, else the configured
+        default, else empty (the model's stock voice)."""
         candidate = (voice or "").strip()
-        if candidate and candidate.lower() not in _NON_FISH_VOICE_IDS:
+        if _looks_like_fish_voice_id(candidate):
             return candidate
         return settings.fish_voice_id.strip()
 
