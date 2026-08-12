@@ -151,6 +151,19 @@ function browserVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+/** Kokoro voices on Together AI (the default TTS model there). Prefix decodes
+ *  as: a=American, b=British; f=female, m=male. Not exhaustive — the field also
+ *  accepts any other voice name the configured model supports. */
+export const TOGETHER_VOICES: VoiceOption[] = [
+  { id: "af_heart", name: "Heart", descriptor: "American · female · warm" },
+  { id: "af_bella", name: "Bella", descriptor: "American · female · bright" },
+  { id: "af_alloy", name: "Alloy", descriptor: "American · female · neutral" },
+  { id: "am_adam", name: "Adam", descriptor: "American · male · steady" },
+  { id: "am_michael", name: "Michael", descriptor: "American · male · warm" },
+  { id: "bf_alice", name: "Alice", descriptor: "British · female" },
+  { id: "bm_daniel", name: "Daniel", descriptor: "British · male" },
+];
+
 const SERVER_VOICES: VoiceOption[] = [
   { id: "default", name: "Ava", descriptor: "Warm · neutral American" },
   { id: "rachel", name: "Rachel", descriptor: "Calm · professional" },
@@ -165,7 +178,13 @@ const SERVER_VOICES: VoiceOption[] = [
  */
 export async function listVoices(langBase = "en"): Promise<VoiceOption[]> {
   const mode = await getSpeechMode();
-  if (mode === "server") return SERVER_VOICES;
+  if (mode === "server") {
+    // Together exposes real, named voices — show those rather than a generic
+    // list, so picking one actually changes what you hear.
+    const provider = await getTtsProvider();
+    if (provider === "together") return TOGETHER_VOICES;
+    return SERVER_VOICES;
+  }
 
   const all = await browserVoices();
   const matching = all.filter((v) => v.lang.toLowerCase().startsWith(langBase));

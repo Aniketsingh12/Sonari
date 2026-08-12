@@ -9,6 +9,7 @@ import asyncio
 import importlib.util
 import io
 import math
+import re
 import struct
 import wave
 
@@ -188,10 +189,74 @@ class FishAudioTTS(TTSProvider):
         return True, f"{settings.fish_model} · {voice}"
 
 
+# Placeholder ids the UI may still hold from another engine (its own built-in
+# list, or a browser voiceURI like "Microsoft David - English (United States)").
+_UI_PLACEHOLDER_VOICES = {"default", "rachel", "amy", "marcus"}
+
+
+def _looks_like_together_voice(value: str) -> bool:
+    """Together voice names are bare lowercase tokens: af_heart, am_adam, cove.
+
+    Browser voiceURIs (spaces, capitals, dots) and the UI's placeholder names
+    are not valid voices, and sending one fails the request.
+    """
+    v = value.strip()
+    if v.lower() in _UI_PLACEHOLDER_VOICES:
+        return False
+    return bool(re.fullmatch(r"[a-z][a-z0-9_]{1,31}", v))
+
+
+class TogetherTTS(TTSProvider):
+    """Speech from Together AI — same API key as the LLM.
+
+    Returns WAV, so it works on the browser *and* the streaming telephony path
+    (which needs linear PCM it can resample). Endpoint is OpenAI-shaped
+    (``model`` / ``input`` / ``voice``), so httpx is enough — no SDK.
+    """
+
+    name = "together"
+    mode = "paid"
+    content_type = "audio/wav"
+
+    def _voice(self, voice: str | None) -> str:
+        candidate = (voice or "").strip()
+        if _looks_like_together_voice(candidate):
+            return candidate
+        return settings.together_voice.strip()
+
+    async def synthesize(self, text: str, voice: str | None = None) -> bytes:
+        import httpx
+
+        payload = {
+            "model": settings.together_tts_model,
+            "input": text,
+            "voice": self._voice(voice),
+            "response_format": "wav",
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.together_api_key or ''}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.together.ai/v1/audio/speech",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            return resp.content
+
+    def is_available(self) -> tuple[bool, str]:
+        if not settings.together_api_key:
+            return False, "set TOGETHER_API_KEY (api.together.ai)"
+        return True, f"{settings.together_tts_model} · {settings.together_voice}"
+
+
 def build_tts(provider: str) -> TTSProvider:
     return {
         "mock": MockTTS,
         "piper": PiperTTS,
         "elevenlabs": ElevenLabsTTS,
         "fish": FishAudioTTS,
+        "together": TogetherTTS,
     }.get(provider, MockTTS)()

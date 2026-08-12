@@ -10,7 +10,7 @@ import pytest
 
 from app.config import settings
 from app.providers.llm import TogetherLLM, _strip_code_fence, build_llm
-from app.providers.tts import FishAudioTTS, build_tts
+from app.providers.tts import FishAudioTTS, TogetherTTS, build_tts
 
 
 def test_tts_selection_maps_names_to_providers():
@@ -158,3 +158,79 @@ def test_together_json_mode_asks_for_raw_json_and_unwraps_the_reply(monkeypatch)
     assert captured["body"]["messages"][0]["role"] == "system"
     assert "no markdown code fences" in captured["body"]["messages"][0]["content"]
     assert _json.loads(out) == {"intent": "faq"}
+
+
+# ------------------------------------------------------- Together AI (speech)
+def test_together_tts_is_selectable_and_returns_wav():
+    """WAV (not MP3) is what makes a TTS usable on the streaming telephony path."""
+    p = build_tts("together")
+    assert p.name == "together"
+    assert p.content_type == "audio/wav"
+
+
+def test_together_tts_needs_the_same_key_as_the_llm(monkeypatch):
+    monkeypatch.setattr(settings, "together_api_key", None)
+    available, detail = build_tts("together").is_available()
+    assert available is False and "TOGETHER_API_KEY" in detail
+
+
+@pytest.mark.parametrize("voice", ["af_heart", "am_adam", "bf_alice", "cove"])
+def test_together_accepts_real_voice_names(monkeypatch, voice):
+    monkeypatch.setattr(settings, "together_voice", "af_heart")
+    assert TogetherTTS()._voice(voice) == voice
+
+
+@pytest.mark.parametrize(
+    "not_a_voice",
+    [
+        "default",
+        "rachel",
+        "",
+        None,
+        "Microsoft David - English (United States)",   # browser voiceURI
+        "com.apple.voice.compact.en-US.Samantha",
+        "802e3bc2b27e49c2995d23ef70e6ac89",            # a Fish reference id
+    ],
+)
+def test_together_falls_back_when_the_voice_isnt_a_together_name(monkeypatch, not_a_voice):
+    """An agent created under another engine still holds that engine's voice id;
+    passing it through would fail the request."""
+    monkeypatch.setattr(settings, "together_voice", "af_heart")
+    assert TogetherTTS()._voice(not_a_voice) == "af_heart"
+
+
+def test_together_tts_request_matches_the_documented_contract(monkeypatch):
+    import asyncio
+    import json as _json
+
+    import httpx
+
+    monkeypatch.setattr(settings, "together_api_key", "sk-test")
+    monkeypatch.setattr(settings, "together_tts_model", "hexgrad/Kokoro-82M")
+    monkeypatch.setattr(settings, "together_voice", "af_heart")
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("authorization")
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200, content=b"RIFFfake")
+
+    base = httpx.AsyncClient
+
+    class Stub(base):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, transport=httpx.MockTransport(handler), **kw)
+
+    monkeypatch.setattr(httpx, "AsyncClient", Stub)
+    audio = asyncio.run(TogetherTTS().synthesize("Hello"))
+
+    assert captured["url"] == "https://api.together.ai/v1/audio/speech"
+    assert captured["auth"] == "Bearer sk-test"
+    assert captured["body"] == {
+        "model": "hexgrad/Kokoro-82M",
+        "input": "Hello",
+        "voice": "af_heart",
+        "response_format": "wav",
+    }
+    assert audio == b"RIFFfake"

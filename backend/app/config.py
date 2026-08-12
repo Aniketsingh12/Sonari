@@ -14,7 +14,7 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 STTProvider = Literal["mock", "faster_whisper", "openai", "groq"]
-TTSProvider = Literal["mock", "piper", "elevenlabs", "fish"]
+TTSProvider = Literal["mock", "piper", "elevenlabs", "fish", "together"]
 LLMProvider = Literal["mock", "ollama", "anthropic", "openai", "gemini", "together"]
 
 
@@ -129,6 +129,14 @@ class Settings(BaseSettings):
     # model (e.g. meta-llama/Llama-3.1-8B-Instruct-Turbo) if you want lower
     # latency per turn, which matters in a spoken conversation.
     together_model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    # Together also hosts TTS on the same key (TTS_PROVIDER=together). Kokoro is
+    # the small/fast one ($4 per 1M chars) — latency is what you feel in a spoken
+    # conversation. Pricier, higher-fidelity options on the same endpoint:
+    #   canopylabs/orpheus-3b-0.1-ft ($15)   cartesia/sonic-3 ($65, fastest)
+    together_tts_model: str = "hexgrad/Kokoro-82M"
+    # A Kokoro voice name. af_* / am_* are American female/male, bf_* / bm_*
+    # British. Must match the model you picked above.
+    together_voice: str = "af_heart"
 
     # ---- Free-tier API models (great for a zero-cost cloud deploy) ----
     # Gemini: free key from https://aistudio.google.com/apikey

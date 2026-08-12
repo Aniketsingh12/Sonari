@@ -115,6 +115,13 @@ export function VoicePicker({
           );
         })}
       </div>
+      {provider === "together" && (
+        <p className="mt-3 text-xs text-ink-3">
+          Voices from Together AI — everyone who opens this agent hears the same
+          one. Other voice names your configured model supports also work; set
+          them with <code className="font-mono">TOGETHER_VOICE</code>.
+        </p>
+      )}
       {mode === "browser" && (
         <p className="mt-3 text-xs text-ink-3">
           These are your device's built-in voices, used because no TTS engine is
