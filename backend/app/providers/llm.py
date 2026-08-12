@@ -327,6 +327,86 @@ class GeminiLLM(LLMProvider):
         return True, f"model={settings.gemini_model}"
 
 
+# --------------------------------------------------------------------------- Together
+def _strip_code_fence(text: str) -> str:
+    """Unwrap ```json … ``` around a reply.
+
+    Open-weight models often wrap JSON in a markdown fence even when told not
+    to, and ``json.loads`` would choke on it. Non-fenced text passes through.
+    """
+    s = text.strip()
+    if not s.startswith("```"):
+        return s
+    body = s[3:]
+    if body[:4].lower().startswith("json"):
+        body = body[4:]
+    end = body.rfind("```")
+    return (body[:end] if end != -1 else body).strip()
+
+
+class TogetherLLM(LLMProvider):
+    """Open-weight models hosted by Together AI.
+
+    The API is OpenAI-shaped, so this posts the same chat-completions body with
+    httpx (no SDK dependency, matching the Gemini provider).
+
+    JSON: Together's structured-output mode wants a full ``json_schema``, but
+    this interface only carries a ``json_mode`` flag — and the agent prompts
+    already say "Respond with ONLY this JSON". So we lean on the prompt and
+    unwrap any markdown fence the model adds, which works across every model on
+    the platform rather than only the schema-capable ones.
+    """
+
+    name = "together"
+    mode = "paid"
+
+    async def complete(
+        self,
+        system: str,
+        messages: list[dict],
+        *,
+        model: str | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 512,
+        json_mode: bool = False,
+    ) -> str:
+        import httpx
+
+        if json_mode:
+            system = (
+                f"{system}\n\nReturn only the raw JSON object. No explanation, "
+                "no markdown code fences."
+            )
+        payload = {
+            "model": model or settings.together_model,
+            "messages": [{"role": "system", "content": system}, *messages],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.together_api_key or ''}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.together.ai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        try:
+            text = data["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError):
+            return ""
+        return _strip_code_fence(text) if json_mode else text.strip()
+
+    def is_available(self) -> tuple[bool, str]:
+        if not settings.together_api_key:
+            return False, "set TOGETHER_API_KEY (api.together.ai)"
+        return True, f"model={settings.together_model}"
+
+
 def build_llm(provider: str) -> LLMProvider:
     return {
         "mock": MockLLM,
@@ -334,4 +414,5 @@ def build_llm(provider: str) -> LLMProvider:
         "anthropic": AnthropicLLM,
         "openai": OpenAILLM,
         "gemini": GeminiLLM,
+        "together": TogetherLLM,
     }.get(provider, MockLLM)()

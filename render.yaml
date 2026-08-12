@@ -51,6 +51,11 @@ services:
       - key: GROQ_API_KEY
         sync: false
 
+      # Together AI — hosted open-weight models (Llama, Qwen, DeepSeek…).
+      # Set LLM_PROVIDER=together to use. Works in the cloud, unlike Ollama.
+      - key: TOGETHER_API_KEY
+        sync: false
+
       # Paid keys — only if you select a paid provider above.
       - key: ANTHROPIC_API_KEY
         sync: false

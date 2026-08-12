@@ -53,7 +53,7 @@ per layer in `backend/.env`:
 |-------|-------------------|-------------------------|-------------------------|----------|
 | **STT** | browser speech recognition | `faster_whisper` | `groq` (Whisper) | `openai` (Whisper) |
 | **TTS** | browser system voices | `piper` | — | `fish` (cheap, WAV) · `elevenlabs` |
-| **LLM** | rule-based keywords | `ollama` | `gemini` | `anthropic` · `openai` |
+| **LLM** | rule-based keywords | `ollama` | `gemini` | `together` (open models, hosted) · `anthropic` · `openai` |
 | **Embeddings** | `hash` trick | `ollama` · `sentence_transformers` | `gemini` | `openai` |
 
 **Free real AI (no cost, no local models).** Get a free key from

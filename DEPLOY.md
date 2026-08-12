@@ -131,8 +131,22 @@ STT_PROVIDER=groq            GROQ_API_KEY=...
 ```
 
 That's real conversation, real semantic search, and real Whisper transcription
-at no cost. Prefer paid models? `LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
-(or `openai`). No code redeploy — just restart with the new env.
+at no cost. No code redeploy — just restart with the new env.
+
+**Want open-weight models without a local GPU?** Together AI hosts Llama, Qwen,
+DeepSeek and friends behind an OpenAI-shaped API — the same family of models you
+run locally with Ollama, but reachable from a deployed container:
+
+```env
+LLM_PROVIDER=together        TOGETHER_API_KEY=...
+TOGETHER_MODEL=meta-llama/Llama-3.3-70B-Instruct-Turbo
+```
+
+Latency is what matters in a spoken conversation, so drop to a smaller model
+(`meta-llama/Llama-3.1-8B-Instruct-Turbo`) if 70B replies feel slow.
+
+Prefer closed paid models? `LLM_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`
+(or `openai`).
 
 ### Voice in the cloud
 

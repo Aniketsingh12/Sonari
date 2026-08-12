@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 STTProvider = Literal["mock", "faster_whisper", "openai", "groq"]
 TTSProvider = Literal["mock", "piper", "elevenlabs", "fish"]
-LLMProvider = Literal["mock", "ollama", "anthropic", "openai", "gemini"]
+LLMProvider = Literal["mock", "ollama", "anthropic", "openai", "gemini", "together"]
 
 
 class Settings(BaseSettings):
@@ -120,6 +120,15 @@ class Settings(BaseSettings):
     fish_voice_id: str = ""
     # Requested WAV sample rate; the telephony path resamples from this anyway.
     fish_sample_rate: int = 24000
+
+    # ---- Together AI (open-weight models on a hosted, OpenAI-shaped API) ----
+    # Key: https://api.together.ai — no local GPU, no Ollama, works in the cloud.
+    together_api_key: str | None = None
+    # Llama 3.3 70B Turbo: strong instruction-following and reliable JSON, which
+    # the receptionist brain needs for intent classification. Swap for a smaller
+    # model (e.g. meta-llama/Llama-3.1-8B-Instruct-Turbo) if you want lower
+    # latency per turn, which matters in a spoken conversation.
+    together_model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
     # ---- Free-tier API models (great for a zero-cost cloud deploy) ----
     # Gemini: free key from https://aistudio.google.com/apikey
