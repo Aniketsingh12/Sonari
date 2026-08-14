@@ -38,21 +38,14 @@ RUN pip install -r requirements.txt
 ARG INSTALL_PIPER=false
 ARG PIPER_VOICE=en_US-amy-medium
 ENV PIPER_DATA_DIR=/app/piper_voices
+# Every line of this RUN ends in a backslash on purpose: Docker ends a RUN at
+# the first line that doesn't, so a multi-line inline script gets parsed as
+# (invalid) Dockerfile instructions and the build dies with "unknown instruction".
+# The voice name arrives as argv[1] because ARG isn't visible to os.environ.
 RUN if [ "$INSTALL_PIPER" = "true" ]; then \
       pip install piper-tts && \
       mkdir -p "$PIPER_DATA_DIR" && \
-      python - "$PIPER_VOICE" <<'PY' ; \
-import sys, urllib.request, os
-voice = sys.argv[1]                                    # e.g. en_US-amy-medium
-lang, region = voice.split("-")[0].split("_")          # en, US
-quality = voice.rsplit("-", 1)[1]                       # medium
-base = ("https://huggingface.co/rhasspy/piper-voices/resolve/main/"
-        f"{lang}/{lang}_{region}/{voice.split('-')[1]}/{quality}/{voice}")
-out = os.environ["PIPER_DATA_DIR"]
-for ext in (".onnx", ".onnx.json"):
-    urllib.request.urlretrieve(base + ext + "?download=true", f"{out}/{voice}{ext}")
-    print("downloaded", voice + ext)
-PY
+      python -c "import os,sys,urllib.request as u; v=sys.argv[1]; loc,name,q=v.split('-',2); b='https://huggingface.co/rhasspy/piper-voices/resolve/main'; [u.urlretrieve('/'.join([b,loc.split('_')[0],loc,name,q,v+e])+'?download=true', os.path.join(os.environ['PIPER_DATA_DIR'], v+e)) for e in ('.onnx','.onnx.json')]" "$PIPER_VOICE"; \
     fi
 
 COPY backend/ .
