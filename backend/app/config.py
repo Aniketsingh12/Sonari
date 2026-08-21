@@ -67,6 +67,16 @@ class Settings(BaseSettings):
     def auth_enabled(self) -> bool:
         return bool(self.admin_password.strip())
 
+    # ---- Public-endpoint spend guards ----
+    # The per-IP limiter in api/ratelimit.py caps how *fast* one visitor can
+    # spend your AI quota. These cap how *much* everyone can spend in total per
+    # UTC day, which is the number that actually shows up on the bill: without a
+    # ceiling, N visitors (or one rotating X-Forwarded-For) simply multiply the
+    # per-IP allowance by N. Signed-in owners are exempt, so hitting the cap
+    # never locks you out of your own dashboard. 0 disables a cap entirely.
+    public_daily_turn_limit: int = 500     # LLM conversation turns
+    public_daily_media_limit: int = 1000   # /tts + /transcribe calls
+
     # ---- Database ----
     # Default is a local SQLite file; swap for Postgres/Supabase in production:
     #   postgresql+asyncpg://user:pass@host:5432/sonari

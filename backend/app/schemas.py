@@ -244,11 +244,24 @@ class ProviderStatus(BaseModel):
     detail: str = ""
 
 
+class UsageOut(BaseModel):
+    """How much of today's public AI allowance is gone (see api/ratelimit.py)."""
+
+    turns_used: int
+    turns_limit: int
+    media_used: int
+    media_limit: int
+
+
 class HealthOut(BaseModel):
     status: str
     version: str
     environment: str
     providers: list[ProviderStatus]
+    # Whether the owner dashboard is password-protected. False on a public URL
+    # means anyone who finds it can edit and delete every agent.
+    dashboard_protected: bool = False
+    usage: UsageOut | None = None
 
 
 # ---------------------------------------------------------------- Simulator
