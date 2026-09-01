@@ -353,9 +353,11 @@ export function Settings({
               ))}
               <p className="flex items-start gap-2 pt-1 text-xs text-ink-3">
                 <IconServer width={14} height={14} className="mt-0.5 shrink-0" />
-                Switch open-source (faster-whisper, Piper, Ollama) and paid (OpenAI,
-                ElevenLabs, Anthropic) engines per layer in the backend{" "}
-                <code className="rounded bg-surface-2 px-1 font-mono">.env</code>.
+                Set each layer independently in the backend{" "}
+                <code className="rounded bg-surface-2 px-1 font-mono">.env</code>:
+                self-hosted (faster-whisper, Piper, Ollama), hosted open models
+                (Together, Groq, Gemini), or paid (OpenAI, ElevenLabs, Anthropic).
+                The cards above are live — they show what is running right now.
               </p>
             </div>
           ) : (

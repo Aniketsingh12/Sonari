@@ -112,50 +112,67 @@ export function Landing({
   return (
     <div className="min-h-screen bg-bg">
       {/* ---------------- Nav ---------------- */}
-      <header className="sticky top-0 z-20 border-b border-line bg-bg/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center gap-2.5 px-4 py-3.5 sm:px-6">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand text-brand-ink">
-            <Equalizer size={16} className="text-brand-ink" />
+      <header className="sticky top-0 z-20 px-4 pt-5 sm:px-6">
+        <nav className="nav-pill anim-drop mx-auto h-[52px] w-full max-w-[880px] pl-3.5 pr-2.5">
+          <span className="anim-fade anim-fade-1 grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-brand text-brand-ink">
+            <Equalizer size={15} className="text-brand-ink" />
           </span>
-          <div className="leading-tight">
-            <p className="font-display text-[15px] font-bold text-ink">Sonari</p>
-            <p className="text-[11px] text-ink-3">AI voice agent</p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+          <span className="anim-fade anim-fade-2 ml-2.5 flex min-w-0 items-baseline gap-2.5">
+            <span className="text-[17.1px] font-black tracking-wordmark text-bg">
+              Sonari
+            </span>
+            <span className="hidden truncate text-caption font-light tracking-caption text-bg/55 sm:inline">
+              AI voice agent
+            </span>
+          </span>
+          <span className="anim-fade anim-fade-4 ml-auto pl-3">
             {configured ? (
-              <Link to="/" className="btn-primary !py-2">
-                Open my agents <IconArrowRight width={15} height={15} />
+              <Link to="/" className="nav-pill__cta">
+                Open my agents
               </Link>
             ) : (
-              <Link to="/new" className="btn-primary !py-2">
+              <Link to="/new" className="nav-pill__cta">
                 Set up my agent
               </Link>
             )}
-          </div>
-        </div>
+          </span>
+        </nav>
       </header>
 
       {/* ---------------- Hero ---------------- */}
-      <section className="mx-auto max-w-5xl px-4 pb-4 pt-12 sm:px-6 sm:pt-16">
-        <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr] lg:gap-12">
+      {/* One centred column, then a full-bleed band the product card sits on.
+          The old two-column split put the headline and the demo in competition;
+          stacking them lets the headline land first and the card land second. */}
+      <section className="mx-auto max-w-3xl px-4 pt-12 text-center sm:px-6 sm:pt-16">
+        <div>
           <div>
             <span className="chip border border-signal/30 bg-signal/10 text-signal">
               <Equalizer live size={13} className="text-signal" />
               Answers in under 1.5 seconds
             </span>
 
-            <h1 className="mt-5 font-display text-4xl font-bold leading-[1.05] tracking-tight text-ink sm:text-5xl">
-              Build a voice agent
-              <span className="text-brand"> people can talk to.</span>
+            {/* Single-colour display type, wiped in from the baseline. The
+                headline carries the weight here, so it is not tinted. */}
+            <h1
+              className="anim-wipe mt-5 font-display text-ink"
+              style={{
+                fontSize: "clamp(33px, 3.2vw + 1.6vh, var(--fs-display))",
+                fontWeight: "var(--fw-regular)",
+                letterSpacing: "var(--tr-display)",
+                lineHeight: "var(--lh-display)",
+                textWrap: "balance",
+              }}
+            >
+              Build a voice agent people can talk to.
             </h1>
 
-            <p className="mt-5 max-w-lg text-base leading-relaxed text-ink-2 sm:text-lg">
+            <p className="anim-rise t-body mx-auto mt-6 max-w-xl text-ink-2">
               Describe what it should do — tutor, coding helper, support agent,
               receptionist — and Sonari turns it into an agent that speaks and
               listens. Share it as a link, embed it, or put it on a phone line.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center gap-3">
+            <div className="anim-rise anim-rise-late mt-8 flex flex-wrap items-center justify-center gap-3">
               {configured ? (
                 <Link to="/" className="btn-primary">
                   Open my agents <IconArrowRight width={16} height={16} />
@@ -176,20 +193,33 @@ export function Landing({
               )}
             </div>
 
-            <p className="mt-4 text-xs text-ink-3">
+            <p className="mt-4 text-caption font-light tracking-caption text-ink-3">
               Start from a template — assistant, tutor, coding helper, support,
               coach, interviewer, or receptionist.
             </p>
 
             {error && (
-              <div className="mt-4 max-w-md">
+              <div className="mx-auto mt-4 max-w-md text-left">
                 <ErrorNote message={error} />
               </div>
             )}
           </div>
+        </div>
+      </section>
 
-          {/* The hero is the product: a call you answer and actually hear. */}
-          <DemoCall />
+      {/* ---------------- Band ---------------- */}
+      {/* The hero is the product: a call you answer and actually hear. It sits
+          on a full-bleed accent band and deliberately overruns the bottom edge
+          onto the page — that overhang is the composition, not a clipped card. */}
+      <section className="relative mt-12 sm:mt-16">
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-[220px] bg-brand-2 sm:h-[260px]"
+        />
+        <div className="relative mx-auto max-w-2xl px-4 pt-12 sm:px-6 sm:pt-14">
+          <div className="anim-rise-far">
+            <DemoCall />
+          </div>
         </div>
       </section>
 
@@ -227,8 +257,10 @@ export function Landing({
             Your models, your bill
           </h2>
           <p className="mt-2 max-w-xl text-ink-2">
-            Every layer runs on a free local model or a paid API — your choice, per
-            layer, in one config file. Swap any of them without touching the agent.
+            Every layer runs on a model you self-host or one served over an API —
+            your choice, per layer, in one config file. Swap any of them without
+            touching the agent. “Running now” is live, so it always shows what
+            this deployment is actually using.
           </p>
 
           <div className="mt-8 overflow-x-auto">
@@ -236,17 +268,17 @@ export function Landing({
               <thead>
                 <tr className="text-left">
                   <th className="label pb-3 pr-4 font-semibold">Layer</th>
-                  <th className="label pb-3 pr-4 font-semibold">Open-source</th>
-                  <th className="label pb-3 pr-4 font-semibold">Paid API</th>
+                  <th className="label pb-3 pr-4 font-semibold">Self-hosted</th>
+                  <th className="label pb-3 pr-4 font-semibold">Hosted API</th>
                   <th className="label pb-3 font-semibold">Running now</th>
                 </tr>
               </thead>
               <tbody>
                 {[
-                  ["Speech-to-text", "faster-whisper", "OpenAI Whisper", "stt"],
-                  ["Reasoning", "Ollama", "Anthropic · OpenAI", "llm"],
-                  ["Text-to-speech", "Piper", "ElevenLabs", "tts"],
-                  ["Knowledge search", "sentence-transformers", "OpenAI", "embedding"],
+                  ["Speech-to-text", "faster-whisper", "Together · Groq · OpenAI", "stt"],
+                  ["Reasoning", "Ollama", "Together · Gemini · Anthropic", "llm"],
+                  ["Text-to-speech", "Piper", "Together · Fish · ElevenLabs", "tts"],
+                  ["Knowledge search", "sentence-transformers", "Gemini · OpenAI", "embedding"],
                 ].map(([layer, oss, paid, kind]) => {
                   const p = health.data?.providers.find((x) => x.kind === kind);
                   return (
@@ -366,9 +398,12 @@ function DemoCall() {
   };
 
   return (
-    <div className="card overflow-hidden shadow-pop">
+    // Shell-and-panel: a light outer card holding a white panel, lifted off the
+    // accent band by a white rim rather than a drop shadow alone.
+    <div className="card-raised overflow-hidden p-2">
+     <div className="panel overflow-hidden">
       {/* Call header */}
-      <div className="flex items-center gap-3 border-b border-line bg-gradient-to-r from-brand/10 to-transparent px-5 py-4">
+      <div className="flex items-center gap-3 border-b border-line px-5 py-4">
         <span className="relative grid h-11 w-11 place-items-center rounded-full bg-brand text-brand-ink">
           {phase === "idle" && (
             <span className="absolute inset-0 rounded-full bg-brand/40 animate-pulse-ring" />
@@ -474,10 +509,11 @@ function DemoCall() {
         </div>
       )}
 
-      <p className="border-t border-line px-4 py-2.5 text-center text-[11px] text-ink-3">
+      <p className="border-t border-line px-4 py-2.5 text-center text-caption font-light tracking-caption text-muted">
         Example conversation · spoken live by{" "}
         {mode === "server" ? "your TTS engine" : "your device's voice"}
       </p>
+     </div>
     </div>
   );
 }

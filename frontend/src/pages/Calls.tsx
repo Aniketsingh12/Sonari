@@ -73,11 +73,7 @@ export function Calls({ business }: { business?: Business | null }) {
               ? "No calls match this filter"
               : "No conversations match this filter"
           }
-          hint={
-            books
-              ? "Try a different filter, or simulate a call to generate data."
-              : "Try a different filter, or talk to your agent to generate data."
-          }
+          hint="Try a different filter, or talk to your agent to generate data."
         />
       )}
     </div>

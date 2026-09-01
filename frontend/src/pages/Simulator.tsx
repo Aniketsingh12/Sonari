@@ -5,7 +5,7 @@ import type { Business, Faq, SimulateTurnResult } from "@/api/types";
 import { Equalizer } from "@/components/LiveIndicator";
 import { VoiceControls } from "@/components/VoiceControls";
 import { PageHeader, Toggle } from "@/components/ui";
-import { IconMic, IconPhone, IconSend, IconUser, IconX } from "@/components/icons";
+import { IconMic, IconSend, IconUser, IconX } from "@/components/icons";
 import { classNames, outcomeMeta } from "@/lib/format";
 import { languageBase } from "@/lib/languages";
 import { useMic } from "@/lib/useMic";
@@ -217,10 +217,10 @@ export function Simulator({ business }: { business: Business | null }) {
   return (
     <div>
       <PageHeader
-        title={isReceptionist ? "Try a call" : "Talk to your agent"}
+        title="Talk to your agent"
         subtitle={
           isReceptionist
-            ? "Talk to your agent right in the browser — the same STT → reasoning → TTS pipeline a real caller hits."
+            ? "Talk to your agent right in the browser — the same speech → reasoning → speech pipeline a phone line would reach."
             : "Talk to your agent right in the browser — the same speech → reasoning → speech pipeline your users get."
         }
         actions={
@@ -251,14 +251,12 @@ export function Simulator({ business }: { business: Business | null }) {
                     : mic.listening
                       ? "Listening…"
                       : "Connected"
-                  : isReceptionist
-                    ? "Ready to take your call"
-                    : "Ready when you are"}
+                  : "Ready when you are"}
               </p>
             </div>
             {live && (
               <button className="btn-outline !py-2 text-danger" onClick={endCall}>
-                <IconX width={16} height={16} /> {isReceptionist ? "Hang up" : "End"}
+                <IconX width={16} height={16} /> End
               </button>
             )}
           </div>
@@ -267,27 +265,22 @@ export function Simulator({ business }: { business: Business | null }) {
           {!live ? (
             <div className="grid place-items-center px-6 py-16 text-center">
               <span className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-brand/12 text-brand">
-                {isReceptionist ? (
-                  <IconPhone width={28} height={28} />
-                ) : (
-                  <IconMic width={28} height={28} />
-                )}
+                <IconMic width={28} height={28} />
               </span>
               <p className="font-display text-lg font-semibold text-ink">
-                {isReceptionist ? "Ring, ring" : `Talk to ${business?.name ?? "your agent"}`}
+                Talk to {business?.name ?? "your agent"}
               </p>
+              {/* This is a browser voice conversation for every agent type — a
+                  receptionist just happens to be able to take bookings during
+                  one. Framing it as a phone call would describe the optional
+                  telephony add-on, not what this button actually does. */}
               <p className="mt-1 max-w-sm text-sm text-ink-2">
                 {isReceptionist
-                  ? "Start a call to hear your agent greet the caller, answer questions, and book appointments — all live."
+                  ? "Start talking and your agent will greet you, answer questions, and book appointments — all live."
                   : "Start a conversation and just talk — the agent listens, thinks, and answers out loud."}
               </p>
               <button className="btn-primary mt-5" onClick={startCall}>
-                {isReceptionist ? (
-                  <IconPhone width={16} height={16} />
-                ) : (
-                  <IconMic width={16} height={16} />
-                )}{" "}
-                {isReceptionist ? "Start call" : "Start talking"}
+                <IconMic width={16} height={16} /> Start talking
               </button>
             </div>
           ) : (

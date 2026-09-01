@@ -3,26 +3,90 @@
 @tailwind utilities;
 
 /* ============================================================
-   Design tokens — "operator console" identity for VoiceDesk.
-   Brand indigo carries actions; signal amber means "the line is
-   live". Values are space-separated RGB channels so Tailwind can
+   Design tokens.
+
+   Type is Figtree as a VARIABLE font: the weights below (388,
+   470, 511, 577, 783) are real axis instances, not the usual
+   400/500/700 stops — which is why the font is loaded with
+   display:block and never allowed to synthesize.
+
+   Colour is near-monochrome — pure black ink on white, greys
+   for structure — with a single cyan accent (#38c6ec) carrying
+   the live/active state.
+
+   Colours are space-separated RGB channels so Tailwind can
    apply alpha via rgb(var(--x) / <alpha-value>).
    ============================================================ */
 :root {
-  --bg: 246 246 250;
+  /* Design-pixel unit. Card internals are authored against a 548px
+     mockup; scaling --u rescales every length inside it proportionally. */
+  --u: 548px;
+  --dp: calc(var(--u) / 548);
+
+  /* ---- Type scale ---- */
+  --fs-display: 55.7px;
+  --fs-title: calc(var(--dp) * 20);
+  --fs-heading: calc(var(--dp) * 17);
+  --fs-body: 16.1px;
+  --fs-eyebrow: calc(var(--dp) * 15.8);
+  --fs-ui: 15px;
+  --fs-meta: calc(var(--dp) * 14.3);
+  --fs-item: calc(var(--dp) * 12.9);
+  --fs-caption: calc(var(--dp) * 12.2);
+  --fs-tab: calc(var(--dp) * 12.1);
+  --fs-sup: 11.4px;
+  --fs-wordmark: 17.1px;
+
+  /* ---- Weights (variable-font instances) ---- */
+  --fw-light: 388;
+  --fw-regular: 470;
+  --fw-medium: 500;
+  --fw-semibold: 511;
+  --fw-bold: 577;
+  --fw-black: 783;
+
+  /* ---- Tracking (tight throughout) ---- */
+  --tr-display: -0.0572em;
+  --tr-title: -0.057em;
+  --tr-heading: -0.02em;
+  --tr-body: -0.0475em;
+  --tr-eyebrow: -0.0293em;
+  --tr-ui: -0.008em;
+  --tr-cta: -0.02em;
+  --tr-meta: -0.0447em;
+  --tr-item: -0.0287em;
+  --tr-caption: -0.0295em;
+  --tr-tab: -0.0398em;
+  --tr-wordmark: -0.0075em;
+
+  /* ---- Leading ---- */
+  --lh-display: 1.1;
+  --lh-body: 1.45;
+  --lh-flat: 1;
+
+  /* ---- Motion ---- */
+  --ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---- Ink / surfaces ---- */
+  --bg: 255 255 255;
   --surface: 255 255 255;
-  --surface-2: 244 244 249;
-  --line: 226 226 235;
-  --ink: 20 20 27;
-  --ink-2: 82 82 96;
-  --ink-3: 138 138 154;
-  --brand: 84 87 229;
-  --brand-2: 124 106 240;
-  --brand-ink: 255 255 255;
-  --signal: 240 158 34;
-  --good: 12 163 12;
-  --info: 42 120 214;
-  --warn: 224 143 0;
+  --surface-2: 242 242 242;
+  --line: 237 237 237;
+  --ink: 0 0 0;
+  --ink-2: 46 46 46;
+  /* #b8b8b8 from the reference is decorative-only (card meta, captions) and
+     fails contrast as body text, so it lives in --muted. --ink-3 is the
+     readable secondary used across the dashboard. */
+  --ink-3: 122 122 122;
+  --muted: 184 184 184;
+  --brand: 56 198 236;
+  --brand-2: 13 181 237;
+  --brand-ink: 0 0 0;
+  --signal: 246 168 37;
+  --good: 42 154 48;
+  --info: 56 198 236;
+  --warn: 246 168 37;
   --danger: 208 59 59;
   /* Categorical chart hues (validated dataviz palette, light steps). */
   --c1: 42 120 214;
@@ -35,20 +99,21 @@
 }
 
 .dark {
-  --bg: 12 12 18;
-  --surface: 23 23 31;
-  --surface-2: 30 30 40;
-  --line: 42 42 55;
-  --ink: 244 244 248;
-  --ink-2: 176 176 190;
-  --ink-3: 122 122 138;
-  --brand: 124 124 246;
-  --brand-2: 150 133 248;
-  --brand-ink: 255 255 255;
-  --signal: 245 178 76;
-  --good: 45 195 90;
-  --info: 90 160 240;
-  --warn: 240 176 60;
+  --bg: 0 0 0;
+  --surface: 18 18 18;
+  --surface-2: 30 30 30;
+  --line: 38 38 38;
+  --ink: 255 255 255;
+  --ink-2: 214 214 214;
+  --ink-3: 150 150 150;
+  --muted: 120 120 120;
+  --brand: 56 198 236;
+  --brand-2: 13 181 237;
+  --brand-ink: 0 0 0;
+  --signal: 246 168 37;
+  --good: 62 186 70;
+  --info: 56 198 236;
+  --warn: 246 168 37;
   --danger: 232 108 108;
   /* Categorical chart hues (validated dataviz palette, dark steps). */
   --c1: 57 135 229;
@@ -71,12 +136,16 @@ body,
 }
 
 body {
-  @apply bg-bg text-ink font-sans antialiased;
-  font-feature-settings: "cv02", "cv03", "cv04";
+  @apply bg-bg text-ink font-sans;
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--tr-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
 }
 
 ::selection {
-  background: rgb(var(--brand) / 0.22);
+  background: rgb(var(--brand) / 0.3);
 }
 
 /* Focus ring — visible for keyboard users, quiet for mouse. */
@@ -86,7 +155,7 @@ body {
   border-radius: 4px;
 }
 
-/* Recessive, on-brand scrollbars. */
+/* Recessive scrollbars. */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgb(var(--ink-3) / 0.4) transparent;
@@ -103,16 +172,113 @@ body {
 }
 
 @layer components {
+  /* ---------------------------------------------------------------
+     Type utilities. Every piece of text in the app should use one of
+     these rather than inventing a size/weight/tracking combination.
+     --------------------------------------------------------------- */
+  .t-display {
+    font-size: var(--fs-display);
+    font-weight: var(--fw-regular);
+    letter-spacing: var(--tr-display);
+    line-height: var(--lh-display);
+    @apply text-ink;
+  }
+  .t-body {
+    font-size: var(--fs-body);
+    font-weight: var(--fw-regular);
+    letter-spacing: var(--tr-body);
+    line-height: var(--lh-body);
+    @apply text-ink;
+  }
+  .t-title {
+    font-size: var(--fs-title);
+    font-weight: var(--fw-light);
+    letter-spacing: var(--tr-title);
+    line-height: var(--lh-flat);
+    @apply text-ink;
+  }
+  .t-heading {
+    font-size: var(--fs-heading);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--tr-heading);
+    line-height: var(--lh-flat);
+    @apply text-ink;
+  }
+  .t-eyebrow {
+    font-size: var(--fs-eyebrow);
+    font-weight: var(--fw-light);
+    letter-spacing: var(--tr-eyebrow);
+    line-height: var(--lh-flat);
+    @apply text-ink;
+  }
+  .t-meta {
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-light);
+    letter-spacing: var(--tr-meta);
+    line-height: var(--lh-flat);
+    color: rgb(var(--muted));
+  }
+  .t-item {
+    font-size: var(--fs-item);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tr-item);
+    line-height: var(--lh-flat);
+    @apply text-ink;
+  }
+  .t-caption {
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-light);
+    letter-spacing: var(--tr-caption);
+    line-height: var(--lh-flat);
+    color: rgb(var(--muted));
+  }
+
+  /* ---------------------------------------------------------------
+     Surfaces
+     --------------------------------------------------------------- */
   .card {
-    @apply bg-surface border border-line rounded-2xl shadow-card;
+    @apply bg-surface border border-line;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.03), 0 12px 32px -20px rgb(0 0 0 / 0.14);
   }
+  /* The mockup treatment: a light shell that holds white panels, lifted off a
+     coloured ground by a white rim rather than a drop shadow alone. */
+  .card-raised {
+    @apply bg-surface-2;
+    border-radius: calc(var(--dp) * 16);
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.6),
+      0 0 calc(var(--dp) * 9) calc(var(--dp) * 3) rgb(255 255 255 / 0.5),
+      0 calc(var(--dp) * 22) calc(var(--dp) * 64) rgb(2 72 105 / 0.16);
+  }
+  .panel {
+    @apply bg-surface;
+    border-radius: 8px;
+  }
+  .row-item {
+    @apply bg-surface border border-line;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.03);
+  }
+
+  /* ---------------------------------------------------------------
+     Controls — pill geometry throughout (17px radius, 34px tall).
+     --------------------------------------------------------------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-      text-sm font-semibold transition-colors disabled:opacity-50
-      disabled:cursor-not-allowed select-none;
+    @apply inline-flex select-none items-center justify-center gap-2
+      whitespace-nowrap px-4 transition-colors
+      disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 34px;
+    border-radius: 17px;
+    font-size: var(--fs-ui);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tr-cta);
+    line-height: var(--lh-flat);
   }
+  /* Primary is ink, not accent: the cyan is reserved for live/active state so
+     it keeps meaning. Inverts in dark mode so it stays the loudest control. */
   .btn-primary {
-    @apply btn bg-brand text-brand-ink hover:bg-brand/90 active:bg-brand/95;
+    @apply btn bg-ink text-bg hover:opacity-90 active:opacity-95;
   }
   .btn-ghost {
     @apply btn bg-transparent text-ink-2 hover:bg-surface-2 hover:text-ink;
@@ -120,25 +286,250 @@ body {
   .btn-outline {
     @apply btn border border-line bg-surface text-ink hover:bg-surface-2;
   }
+  .btn-accent {
+    @apply btn bg-brand text-brand-ink hover:opacity-90;
+    font-weight: var(--fw-bold);
+  }
   .input {
-    @apply w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm
-      text-ink placeholder:text-ink-3 focus:border-brand focus:outline-none
-      focus:ring-2 focus:ring-brand/25 transition;
+    @apply w-full border border-line bg-surface px-3.5 py-2.5 text-ink
+      transition placeholder:text-ink-3 focus:border-brand focus:outline-none
+      focus:ring-2 focus:ring-brand/30;
+    border-radius: 12px;
+    font-size: var(--fs-ui);
+    font-weight: var(--fw-regular);
+    letter-spacing: var(--tr-body);
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs
-      font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1;
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tr-caption);
+    line-height: var(--lh-flat);
   }
   .label {
-    @apply text-xs font-semibold uppercase tracking-wide text-ink-3;
+    @apply uppercase text-ink-3;
+    font-size: var(--fs-caption);
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.06em;
+    line-height: var(--lh-flat);
   }
+
+  /* ---------------------------------------------------------------
+     Navigation
+     --------------------------------------------------------------- */
   .nav-link {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
-      text-ink-2 hover:bg-surface-2 hover:text-ink transition-colors;
+    @apply flex items-center gap-3 px-3 py-2.5 text-ink-2 transition-colors
+      hover:bg-surface-2 hover:text-ink;
+    border-radius: 12px;
+    font-size: var(--fs-ui);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tr-ui);
   }
+  /* Active state is the accent underline idea translated to a sidebar: a solid
+     cyan rail on the leading edge rather than a tinted pill. */
   .nav-link-active {
-    @apply bg-brand/10 text-brand hover:bg-brand/15 hover:text-brand;
+    @apply relative bg-surface-2 text-ink hover:bg-surface-2 hover:text-ink;
+    font-weight: var(--fw-semibold);
   }
+  .nav-link-active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    translate: 0 -50%;
+    height: 18px;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: rgb(var(--brand));
+  }
+
+  /* The signature navigation shape: a pill in the exact inverse of the page —
+     black on white, white on black. Every colour inside it is a token, not a
+     literal, or the whole thing goes invisible when the theme flips. */
+  .nav-pill {
+    @apply flex items-center bg-ink text-bg;
+    border-radius: 26px;
+  }
+  .nav-pill__link {
+    @apply flex items-center whitespace-nowrap text-bg no-underline
+      opacity-80 transition-opacity hover:opacity-100;
+    font-size: var(--fs-ui);
+    font-weight: var(--fw-medium);
+    letter-spacing: var(--tr-ui);
+    line-height: var(--lh-flat);
+  }
+  /* Active nav sits at full strength over a cyan underline — the same
+     active-tab idea, carried into the pill. */
+  .nav-pill__link--active {
+    @apply relative opacity-100;
+    font-weight: var(--fw-semibold);
+  }
+  .nav-pill__link--active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -17px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgb(var(--brand));
+  }
+  .nav-pill__cta {
+    @apply flex items-center justify-center whitespace-nowrap bg-bg
+      text-ink no-underline transition-opacity hover:opacity-90;
+    min-height: 34px;
+    padding: 0 18px;
+    border-radius: 17px;
+    font-size: var(--fs-ui);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--tr-cta);
+    line-height: var(--lh-flat);
+  }
+
+  /* Tabs — idle grey, active sits on a white panel with a cyan underline. */
+  .tab {
+    @apply relative flex items-center whitespace-nowrap border-0 bg-transparent
+      transition-colors;
+    color: rgb(var(--muted));
+    font-size: var(--fs-tab);
+    font-weight: var(--fw-light);
+    letter-spacing: var(--tr-tab);
+    line-height: var(--lh-flat);
+  }
+  .tab:hover {
+    @apply text-ink-2;
+  }
+  .tab.is-active {
+    @apply bg-surface text-ink-2;
+    padding: 0 18px;
+    border-radius: 8px 8px 0 0;
+    font-weight: var(--fw-medium);
+  }
+  .tab.is-active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 12px;
+    right: 13px;
+    height: 2px;
+    background: rgb(var(--brand));
+  }
+
+  /* The wordmark's superscript, sized and lifted as authored. */
+  .wordmark-sup {
+    font-size: var(--fs-sup);
+    font-weight: var(--fw-black);
+    position: relative;
+    top: -5px;
+    left: 1px;
+  }
+}
+
+/* ============================================================
+   Entrance motion.
+
+   Animates the independent `translate` property, never `transform`
+   — several elements carry their own transform (centering, scale)
+   which a transform-based keyframe would silently overwrite.
+   ============================================================ */
+@keyframes enter-wipe {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0% 0);
+  }
+}
+@keyframes enter-drop {
+  from {
+    opacity: 0;
+    translate: 0 -10px;
+  }
+  to {
+    opacity: 1;
+    translate: 0;
+  }
+}
+@keyframes enter-rise14 {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
+  to {
+    opacity: 1;
+    translate: 0;
+  }
+}
+@keyframes enter-rise22 {
+  from {
+    opacity: 0;
+    translate: 0 22px;
+  }
+  to {
+    opacity: 1;
+    translate: 0;
+  }
+}
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Resting state before the timeline runs. Only applied while the document is
+   marked pending, so a reduced-motion visitor never sees a hidden page. */
+[data-enter="pending"] .anim-wipe {
+  clip-path: inset(0 0 100% 0);
+}
+[data-enter="pending"] .anim-drop {
+  opacity: 0;
+  translate: 0 -10px;
+}
+[data-enter="pending"] .anim-rise {
+  opacity: 0;
+  translate: 0 14px;
+}
+[data-enter="pending"] .anim-rise-far {
+  opacity: 0;
+  translate: 0 22px;
+}
+[data-enter="pending"] .anim-fade {
+  opacity: 0;
+}
+
+[data-enter="run"] .anim-wipe {
+  animation: enter-wipe 0.92s var(--ease-reveal) 0.3s both;
+}
+[data-enter="run"] .anim-drop {
+  animation: enter-drop 0.62s var(--ease-settle) 0.05s both;
+}
+[data-enter="run"] .anim-rise {
+  animation: enter-rise14 0.62s var(--ease-settle) 0.62s both;
+}
+[data-enter="run"] .anim-rise-far {
+  animation: enter-rise22 0.94s var(--ease-settle) 0.88s both;
+}
+[data-enter="run"] .anim-fade {
+  animation: enter-fade 0.5s var(--ease-settle) both;
+}
+/* Nav items stagger in behind the pill. */
+[data-enter="run"] .anim-fade-1 {
+  animation-delay: 0.18s;
+}
+[data-enter="run"] .anim-fade-2 {
+  animation-delay: 0.26s;
+}
+[data-enter="run"] .anim-fade-3 {
+  animation-delay: 0.34s;
+}
+[data-enter="run"] .anim-fade-4 {
+  animation-delay: 0.42s;
+}
+[data-enter="run"] .anim-rise-late {
+  animation-delay: 0.78s;
 }
 
 /* Signature: the "live line" equalizer bars. The animation is driven from the

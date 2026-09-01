@@ -128,9 +128,10 @@ export function VoicePicker({
           configured — so everyone who opens your agent hears whatever voice
           <em> their </em> device has. Set{" "}
           <code className="font-mono">TTS_PROVIDER</code> to{" "}
-          <code className="font-mono">fish</code> or{" "}
-          <code className="font-mono">piper</code> to give every listener the
-          same voice.
+          <code className="font-mono">together</code> (hosted, same key as the
+          language model), <code className="font-mono">fish</code>, or{" "}
+          <code className="font-mono">piper</code> (local) to give every listener
+          the same voice.
         </p>
       )}
     </div>

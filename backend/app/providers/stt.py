@@ -1,4 +1,8 @@
-"""Speech-to-text providers: mock, faster-whisper (open-source), OpenAI (paid)."""
+"""Speech-to-text providers.
+
+mock · faster-whisper (open-source, local) · Groq (free-tier Whisper) ·
+Together and OpenAI (paid, hosted Whisper).
+"""
 from __future__ import annotations
 
 import asyncio
@@ -156,10 +160,52 @@ class GroqSTT(STTProvider):
         return True, f"model={settings.groq_stt_model}"
 
 
+class TogetherSTT(STTProvider):
+    """Whisper via Together AI — the same key that already backs the LLM and TTS.
+
+    Together exposes an OpenAI-compatible transcription endpoint, so this is the
+    Groq path with a different host: plain httpx, no SDK, nothing to install.
+    Choosing it means one vendor covers the entire voice loop.
+    """
+
+    name = "together"
+    mode = "paid"
+
+    async def transcribe(self, audio: bytes, sample_rate: int = 16000) -> str:
+        return await self._call("audio.wav", _pcm_to_wav_bytes(audio, sample_rate))
+
+    async def transcribe_file(self, data: bytes, filename: str = "audio.webm") -> str:
+        return await self._call(filename, data)
+
+    async def _call(self, filename: str, data: bytes) -> str:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.together.ai/v1/audio/transcriptions",
+                headers={
+                    "Authorization": f"Bearer {settings.together_api_key or ''}"
+                },
+                files={"file": (filename, data)},
+                data={
+                    "model": settings.together_stt_model,
+                    "response_format": "json",
+                },
+            )
+            resp.raise_for_status()
+            return (resp.json().get("text") or "").strip()
+
+    def is_available(self) -> tuple[bool, str]:
+        if not settings.together_api_key:
+            return False, "set TOGETHER_API_KEY (api.together.ai)"
+        return True, f"model={settings.together_stt_model}"
+
+
 def build_stt(provider: str) -> STTProvider:
     return {
         "mock": MockSTT,
         "faster_whisper": FasterWhisperSTT,
         "openai": OpenAISTT,
         "groq": GroqSTT,
+        "together": TogetherSTT,
     }.get(provider, MockSTT)()

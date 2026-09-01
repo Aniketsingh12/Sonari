@@ -44,8 +44,7 @@ export function Dashboard({ business }: { business: Business | null }) {
         subtitle="Here's what your agent has been handling."
         actions={
           <Link to="/simulator" className="btn-primary">
-            <IconWand width={16} height={16} />{" "}
-            {books ? "Try a call" : "Talk to agent"}
+            <IconWand width={16} height={16} /> Talk to your agent
           </Link>
         }
       />
@@ -141,7 +140,7 @@ export function Dashboard({ business }: { business: Business | null }) {
               }
               action={
                 <Link to="/simulator" className="btn-primary">
-                  {books ? "Simulate a call" : "Talk to your agent"}
+                  Talk to your agent
                 </Link>
               }
             />

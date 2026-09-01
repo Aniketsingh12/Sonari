@@ -53,10 +53,25 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-[28px]">
+        {/* Page titles sit on the display axis but at a working size: light
+            weight, display tracking, so they read as the same voice as the
+            landing headline without shouting inside a dashboard. */}
+        <h1
+          className="font-display text-ink"
+          style={{
+            fontSize: "clamp(23px, 1.4vw + 15px, 30px)",
+            fontWeight: "var(--fw-light)",
+            letterSpacing: "var(--tr-title)",
+            lineHeight: "1.12",
+          }}
+        >
           {title}
         </h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-2">{subtitle}</p>}
+        {subtitle && (
+          <p className="mt-1.5 text-ui font-light tracking-body text-ink-2">
+            {subtitle}
+          </p>
+        )}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

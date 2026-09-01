@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-STTProvider = Literal["mock", "faster_whisper", "openai", "groq"]
+STTProvider = Literal["mock", "faster_whisper", "openai", "groq", "together"]
 TTSProvider = Literal["mock", "piper", "elevenlabs", "fish", "together"]
 LLMProvider = Literal["mock", "ollama", "anthropic", "openai", "gemini", "together"]
 
@@ -144,6 +144,10 @@ class Settings(BaseSettings):
     # conversation. Pricier, higher-fidelity options on the same endpoint:
     #   canopylabs/orpheus-3b-0.1-ft ($15)   cartesia/sonic-3 ($65, fastest)
     together_tts_model: str = "hexgrad/Kokoro-82M"
+    # ...and Whisper on that same key (STT_PROVIDER=together), so one Together
+    # account can cover the whole voice loop — listen, reason, speak — with no
+    # local models and no second vendor.
+    together_stt_model: str = "openai/whisper-large-v3"
     # A Kokoro voice name. af_* / am_* are American female/male, bf_* / bm_*
     # British. Must match the model you picked above.
     together_voice: str = "af_heart"
