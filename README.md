@@ -51,10 +51,17 @@ per layer in `backend/.env`:
 
 | Layer | `mock` (no setup) | Open-source (self-host) | Free API (key, no cost) | Paid API |
 |-------|-------------------|-------------------------|-------------------------|----------|
-| **STT** | browser speech recognition | `faster_whisper` | `groq` (Whisper) | `openai` (Whisper) |
-| **TTS** | browser system voices | `piper` | — | `fish` (cheap, WAV) · `elevenlabs` |
+| **STT** | browser speech recognition | `faster_whisper` | `groq` (Whisper) | `openai` · `together` (Whisper) |
+| **TTS** | browser system voices | `piper` | — | `together` (Kokoro) · `fish` (cheap, WAV) · `elevenlabs` |
 | **LLM** | rule-based keywords | `ollama` | `gemini` | `together` (open models, hosted) · `anthropic` · `openai` |
 | **Embeddings** | `hash` trick | `ollama` · `sentence_transformers` | `gemini` | `openai` |
+
+**One Together AI key covers the whole voice loop.** [Together](https://api.together.ai)
+hosts an OpenAI-compatible LLM endpoint, a Whisper-compatible transcription
+endpoint, and a TTS endpoint (Kokoro) behind a single account — set
+`STT_PROVIDER=together`, `TTS_PROVIDER=together`, `LLM_PROVIDER=together` and
+one `TOGETHER_API_KEY` drives listening, reasoning and speaking, with no local
+models and no juggling separate provider keys.
 
 **Free real AI (no cost, no local models).** Get a free key from
 [Google AI Studio](https://aistudio.google.com/apikey) and
@@ -161,9 +168,8 @@ dashboard instantly for a demo. While you're in it, a banner across the top
 offers **"Exit sample data"** on every page — one click erases it and drops you
 back on the home page. (**Settings → Start over** does the same thing.)
 
-Then go to **Voice agent** (labeled **Try a call** for the receptionist) and
-talk to it right in the browser — the same pipeline a real caller or a shared
-link hits.
+Then go to **Voice agent** and talk to it right in the browser — the same
+pipeline a real caller or a shared link hits.
 
 | Route | |
 |---|---|
@@ -175,10 +181,10 @@ link hits.
 | `/welcome` | The landing page, always reachable (handy for demo videos) |
 
 Opening an agent from the agents home makes it the *active* one (carried in an
-`X-Business-Id` header) and takes you to `/dashboard`. The sidebar's agent chip
-always links back to `/` to switch. **Bookings** and the booking-only call
-filters only appear in the nav for the receptionist — an instruction-driven
-agent's dashboard shows conversations instead.
+`X-Business-Id` header) and takes you to `/dashboard`. The nav pill's agent
+chip always links back to `/` to switch. **Bookings** and the booking-only
+call filters only appear in the nav for the receptionist — an
+instruction-driven agent's dashboard shows conversations instead.
 
 ### Sharing an agent
 
@@ -197,8 +203,15 @@ ADMIN_PASSWORD=something-long-and-random
 ```
 
 Public voice agents, telephony webhooks and `/api/health` stay reachable without
-it. The public AI endpoints are rate-limited per IP so a shared link can't burn
-your quota.
+it. Two independent guards keep a shared link from burning your quota: a
+per-IP **rate limit** (caps how *fast* one visitor can call the AI endpoints)
+and a global **daily spend budget** (caps how *much* everyone combined can use
+per UTC day — `PUBLIC_DAILY_TURN_LIMIT` / `PUBLIC_DAILY_MEDIA_LIMIT` in
+`.env`, 0 = unlimited). The budget is what actually tracks a bill: a per-IP
+limit alone is defeated by enough visitors, or a spoofed IP. Once exhausted it
+fails closed with `429 Too Many Requests` and a `Retry-After` header, and a
+signed-in owner (when `ADMIN_PASSWORD` is set) is always exempt. Current usage
+against both limits is visible on `GET /api/health`.
 
 **Prerequisites:** Python 3.11+ and Node 18+ on your PATH. The launcher checks
 for both and tells you what's missing.
@@ -358,7 +371,7 @@ sonari/
 │   │   ├── api/        REST routers, auth, rate limiting, Twilio/Exotel webhooks
 │   │   ├── services/   call orchestration + post-call finalizer
 │   │   └── workers/    Celery app + post-call job
-│   └── tests/          agent brain, providers, telephony, onboarding, i18n
+│   └── tests/          agent brain, providers, telephony, onboarding, i18n, rate limits
 ├── frontend/           React + TS + Tailwind dashboard (fully responsive)
 │   └── src/
 │       ├── pages/      Landing, Agents (home), CreateAgent (templates),
@@ -387,7 +400,7 @@ sonari/
 | `GET` | `/api/bookings` | Receptionist-made appointments |
 | `GET` | `/api/dashboard/stats` · `/calls` · `/analytics` | Dashboard data |
 
-**Public** (no password — this is what a shared agent link uses; rate-limited per IP):
+**Public** (no password — this is what a shared agent link uses; per-IP rate limited and capped by the daily spend budget):
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -425,8 +438,8 @@ python smoke_test.py # quick manual walkthrough of a call
 
 FastAPI · WebSockets · SQLAlchemy (async) · SQLite/Postgres(pgvector) · Celery ·
 Redis · Twilio Voice · Exotel AgentStream · faster-whisper / Piper / Ollama
-(open-source) · Groq / Gemini (free API) · OpenAI / ElevenLabs / Fish Audio /
-Anthropic (paid) · React · TypeScript · Tailwind · Vite.
+(open-source) · Groq / Gemini (free API) · Together AI / OpenAI / ElevenLabs /
+Fish Audio / Anthropic (paid) · React · TypeScript · Tailwind · Vite.
 
 ## Scope (built)
 
@@ -448,5 +461,6 @@ snippet, so it's usable with zero telephony setup.
 small file, never a change to the agent.
 
 **Ops** — password-gated dashboard (`ADMIN_PASSWORD`, off by default), per-IP
-rate limiting on the public AI endpoints, transcripts/analytics per agent, and
+rate limiting plus a global daily spend budget on the public AI endpoints
+(owner-exempt, fails closed with `429`), transcripts/analytics per agent, and
 a browser simulator for testing any agent without a phone number.
